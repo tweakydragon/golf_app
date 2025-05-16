@@ -24,6 +24,10 @@
       <div class="d-flex justify-content-between align-items-start mb-4">
         <div>
           <h1 class="h2">{{ session.title }}</h1>
+          <div class="alert alert-info mb-2">
+            <strong>Session ID:</strong> {{ session.id }} | 
+            <strong>Shots:</strong> {{ shots.length }}
+          </div>
           <p class="text-muted">
             {{ session.location || 'No location specified' }} | 
             Uploaded {{ formatDate(session.uploadDate) }} |
@@ -34,6 +38,62 @@
           <router-link to="/" class="btn btn-outline-primary">
             <i class="bi bi-arrow-left"></i> Back
           </router-link>
+        </div>
+      </div>
+      
+      <!-- Club Filter for Visualizations -->
+      <div class="mb-4">
+        <div class="input-group">
+          <span class="input-group-text">Filter visualizations by club:</span>
+          <select class="form-select" v-model="clubFilter">
+            <option value="">All Clubs</option>
+            <option v-for="(_, club) in stats?.clubCounts" :key="club" :value="club">
+              {{ club }}
+            </option>
+          </select>
+        </div>
+      </div>
+      
+      <!-- Shot Visualization Section -->
+      <div class="mb-4">
+        <div class="card">
+          <div class="card-header bg-primary text-white">
+            <h2 class="h5 mb-0">Shot Visualization</h2>
+          </div>
+          <div class="card-body">
+            <div v-if="shots && shots.length > 0">
+              <!-- Debug info for developers (can be removed in production) -->
+              <div class="alert alert-info mb-3" v-if="shots.length > 0">
+                <strong>Shot data loaded:</strong> {{shots.length}} shots available for visualization
+              </div>
+              
+              <div class="row">
+                <!-- Top Down View - Full width on smaller screens, half on larger -->
+                <div class="col-xl-6 col-lg-6 col-md-12 mb-4">
+                  <TopDownView :shots="shots" :clubFilter="clubFilter" />
+                </div>
+                
+                <!-- Side View - Full width on smaller screens, half on larger -->
+                <div class="col-xl-6 col-lg-6 col-md-12 mb-4">
+                  <SideView :shots="shots" :clubFilter="clubFilter" />
+                </div>
+                
+                <!-- For testing purposes - can be removed once main charts are working -->
+                <div class="col-12 mt-2 mb-4">
+                  <div class="card">
+                    <div class="card-header">Test Chart</div>
+                    <div class="card-body">
+                      <SimplerChart />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div v-else class="text-center p-4">
+              <i class="bi bi-exclamation-circle text-warning" style="font-size: 2rem;"></i>
+              <p class="mt-3">No shot data available to visualize. Please upload a session with valid shot data.</p>
+            </div>
+          </div>
         </div>
       </div>
       
@@ -81,10 +141,26 @@
       
       <!-- Club Stats Section -->
       <div class="card mb-4" v-if="stats && stats.clubStats">
-        <div class="card-header">
+        <div class="card-header d-flex justify-content-between align-items-center">
           <h2 class="h5 mb-0">Club Performance</h2>
+          <div class="btn-group btn-group-sm">
+            <button class="btn btn-outline-primary" :class="{ active: selectedMetric === 'avgCarry' }" 
+                    @click="selectedMetric = 'avgCarry'">Carry Distance</button>
+            <button class="btn btn-outline-primary" :class="{ active: selectedMetric === 'avgTotal' }"
+                    @click="selectedMetric = 'avgTotal'">Total Distance</button>
+            <button class="btn btn-outline-primary" :class="{ active: selectedMetric === 'avgBallSpeed' }"
+                    @click="selectedMetric = 'avgBallSpeed'">Ball Speed</button>
+          </div>
         </div>
         <div class="card-body">
+          <!-- Club Performance Chart -->
+          <div class="row mb-4">
+            <div class="col-12">
+              <ClubStatsChart :stats="stats" :metric="selectedMetric" />
+            </div>
+          </div>
+          
+          <!-- Club Performance Table -->
           <div class="table-responsive">
             <table class="table table-hover">
               <thead>
@@ -165,6 +241,10 @@
 import { ref, onMounted, computed, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import axios from 'axios';
+import TopDownView from './TopDownView.vue';
+import SideView from './SideView.vue';
+import SimplerChart from './SimplerChart.vue';
+import ClubStatsChart from './ClubStatsChart.vue';
 
 const route = useRoute();
 const sessionId = computed(() => route.params.id);
@@ -175,6 +255,7 @@ const stats = ref(null);
 const loading = ref(true);
 const error = ref(null);
 const clubFilter = ref('');
+const selectedMetric = ref('avgCarry');
 
 // Compute filtered shots based on club filter
 const filteredShots = computed(() => {
@@ -187,17 +268,48 @@ const fetchSessionData = async () => {
   error.value = null;
   
   try {
+    console.log(`Fetching data for session ID: ${sessionId.value}`);
+    
     // Fetch session details
     const sessionResponse = await axios.get(`http://localhost:8080/api/sessions/${sessionId.value}`);
     session.value = sessionResponse.data;
+    console.log("Session data loaded:", session.value);
     
     // Fetch session shots
     const shotsResponse = await axios.get(`http://localhost:8080/api/sessions/${sessionId.value}/shots`);
-    shots.value = shotsResponse.data;
+    
+    if (shotsResponse.data && Array.isArray(shotsResponse.data)) {
+      shots.value = shotsResponse.data;
+      console.log(`Shot data loaded: ${shots.value.length} shots`);
+      
+      // Log some sample shot data to help debug visualization issues
+      if (shots.value.length > 0) {
+        console.log("Sample shot data (first shot):", shots.value[0]);
+        
+        // Check for missing critical fields
+        const missingFields = [];
+        
+        // Count shots with key visualization fields
+        const shotsWithCarryDistance = shots.value.filter(s => s.carryDistance !== undefined && s.carryDistance !== null).length;
+        const shotsWithTotalDistance = shots.value.filter(s => s.totalDistance !== undefined && s.totalDistance !== null).length;
+        const shotsWithLateralDistance = shots.value.filter(s => s.totalLateralDistance !== undefined && s.totalLateralDistance !== null).length;
+        const shotsWithApex = shots.value.filter(s => s.apex !== undefined && s.apex !== null).length;
+        
+        console.log(`Fields coverage: carryDistance: ${shotsWithCarryDistance}/${shots.value.length}, ` +
+                    `totalDistance: ${shotsWithTotalDistance}/${shots.value.length}, ` +
+                    `lateralDistance: ${shotsWithLateralDistance}/${shots.value.length}, ` +
+                    `apex: ${shotsWithApex}/${shots.value.length}`);
+      }
+    } else {
+      console.warn("No shot data received or invalid data format");
+      shots.value = [];
+    }
     
     // Fetch session stats
     const statsResponse = await axios.get(`http://localhost:8080/api/sessions/${sessionId.value}/stats`);
     stats.value = statsResponse.data;
+    console.log("Stats data loaded:", stats.value);
+    
   } catch (err) {
     console.error('Error fetching session data:', err);
     error.value = 'Failed to load session data. Please try again later.';
@@ -238,11 +350,20 @@ const formatSourceType = (sourceType) => {
 // Load data when component mounts or when sessionId changes
 watch(() => route.params.id, (newId) => {
   if (newId) {
+    console.log(`Session ID changed to: ${newId}`);
     fetchSessionData();
   }
 }, { immediate: true });
 
+// When the shots are loaded, log info to help with debugging
+watch(() => shots.value, (newShots) => {
+  if (newShots && newShots.length > 0) {
+    console.log(`Shots data updated: ${newShots.length} shots available for visualization`);
+  }
+});
+
 onMounted(() => {
+  console.log("SessionView component mounted");
   fetchSessionData();
 });
 </script>

@@ -66,19 +66,43 @@ The application will automatically parse your shot data including:
 - Shot classification
 - And many more advanced club and ball metrics
 
-## Data Analysis
+## Data Analysis & Visualization
 Each session includes:
 - Overall session statistics
 - Club-by-club breakdown of performance
 - Individual shot details
 - Advanced metrics and analytics
 
+### Shot Visualizations
+The application provides comprehensive visual representations of your shots:
+- **Top-Down View**: View all shots plotted on a virtual driving range from above, showing the dispersion pattern and distance relative to target. This view utilizes Chart.js to create an accurate scatter plot of your shots.
+- **Side-On View**: See the trajectory of each shot from a side perspective, showing the launch angle, apex height, and distance. The parabolic flight path is calculated based on shot metrics including launch angle and apex height.
+- **Interactive Features**:
+  - Filter visualizations by club to focus on specific parts of your game
+  - Interactive tooltips provide detailed metrics for each shot when hovering
+  - Color coding based on club type for easy visual differentiation
+- **Data Handling**: The visualization system is robust and handles missing or incomplete data by using intelligent defaults based on club type and available metrics.
+
 ---
 
 ## Development
-- Frontend: Vue.js (Vite)
+- Frontend: Vue.js (Vite) with Chart.js for data visualization
 - Backend: Java Spring Boot
 - Database: PostgreSQL
+
+### Data Visualization System
+The shot data visualizations are built using:
+- **Chart.js**: Core charting library that provides responsive, interactive charts
+- **Vue Component Architecture**: Separate components for different visualization types (TopDownView, SideView)
+- **Reactive Data Binding**: Visualizations automatically update when filtering or when new data is available
+- **Mathematical Models**: Flight trajectories are calculated using physics-based parabolic models derived from launch monitor metrics
+
+#### Adding New Visualizations
+To add a new visualization type:
+1. Create a new Vue component in the `frontend/src/components/` directory
+2. Import and use Chart.js or D3.js as needed
+3. Add the component to SessionView.vue and pass the necessary props
+4. Update CSS styling in the component's `<style>` section to ensure proper display
 
 ### Test Data
 The application comes with sample test data that is automatically loaded into the database on startup when using Docker Compose. This data includes:
