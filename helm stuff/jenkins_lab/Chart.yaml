@@ -1,0 +1,7 @@
+# Chart.yaml
+apiVersion: v2
+name: jenkins
+description: A Helm chart for Jenkins
+type: application
+version: 0.1.0
+appVersion: "latest"

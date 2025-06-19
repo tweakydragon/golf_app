@@ -1,0 +1,18 @@
+jenkins:
+  securityRealm:
+    local:
+      allowsSignup: false
+      users:
+        - id: "lab_admin"
+          password: "lab_admin"
+          name: "Lab Admin"
+          properties:
+            - mailer:
+                emailAddress: "lab_admin@example.com"
+  
+  authorizationStrategy:
+    loggedInUsersCanDoAnything:
+      allowAnonymousRead: false
+
+  remotingSecurity:
+    enabled: true

@@ -1,0 +1,25 @@
+{
+  "name": "golf_app",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@popperjs/core": "^2.11.8",
+    "axios": "^1.9.0",
+    "bootstrap": "^5.3.6",
+    "bootstrap-icons": "^1.13.1",
+    "chart.js": "^4.4.9",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.25.1"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.1",
+    "vite": "^6.3.5"
+  }
+}

@@ -1,0 +1,40 @@
+# templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-jenkins
+  labels:
+    app: jenkins
+spec:
+  replicas: 
+  selector:
+    matchLabels:
+      app: jenkins
+  template:
+    metadata:
+      labels:
+        app: jenkins
+    spec:
+      containers:
+        - name: {{ .Values.jenkins.containerName }}
+          image: {{ .Values.jenkins.image }}
+          ports:
+            - containerPort: {{ .Values.jenkins.service.targetPort }}
+            {{- if .Values.jenkins.agentPort.enabled }}
+            - containerPort: {{ .Values.jenkins.agentPort.port }}
+            {{- end }}
+          volumeMounts:
+            - name: jenkins-data
+              mountPath: /var/jenkins_home
+            - name: docker-sock
+              mountPath: /var/run/docker.sock
+          env:
+            - name: JENKINS_OPTS
+              value: "{{ .Values.jenkins.environment.JENKINS_OPTS }}"
+      volumes:
+        - name: jenkins-data
+          persistentVolumeClaim:
+            claimName: {{ .Release.Name }}-jenkins-pvc
+        - name: docker-sock
+          hostPath:
+            path: /var/run/docker.sock
