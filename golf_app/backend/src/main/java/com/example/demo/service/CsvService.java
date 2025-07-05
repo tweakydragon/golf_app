@@ -275,6 +275,7 @@ public class CsvService {
      * @throws IllegalArgumentException If the file format is invalid
      */
     public Session processAwesomeGolfCsv(MultipartFile file, String title, String location) throws IOException {
+        
         if (file.isEmpty()) {
             throw new IllegalArgumentException("File is empty");
         }
@@ -301,17 +302,17 @@ public class CsvService {
             String line;
             List<String> headerColumns = new ArrayList<>();
             
-            // Skip the first line (header descriptions)
-            if ((line = reader.readLine()) != null) {
-                // First line contains header descriptions, we'll skip it
-            }
-            
-            // Read the actual header line with units
+            // Read the first line (header descriptions)
             if ((line = reader.readLine()) != null) {
                 String[] headers = line.split(",");
                 for (String header : headers) {
                     headerColumns.add(header.trim());
                 }
+            }
+            
+            // Skip the second line (units row)
+            if ((line = reader.readLine()) != null) {
+                // Second line contains units, we'll skip it
             }
             
             // Process data rows
@@ -369,6 +370,7 @@ public class CsvService {
     private Shot parseAwesomeGolfShot(List<String> headers, String[] values) {
         Shot shot = new Shot();
         
+        
         // Parse shot date/time from the first column
         String dateTimeStr = values[0].trim();
         if (!dateTimeStr.isEmpty()) {
@@ -382,136 +384,163 @@ public class CsvService {
             }
         }
         
-        // Map values to shot object based on header names
-        for (int i = 0; i < headers.size(); i++) {
-            if (i >= values.length) break;
-            
-            String header = headers.get(i).toLowerCase();
-            String value = values[i].trim();
-            
-            // Skip empty values
-            if (value.isEmpty()) continue;
-            
-            try {
-                switch (header) {
-                    case "club type":
-                        shot.setClub(sanitizeInput(value));
-                        break;
-                    case "club description":
-                        shot.setClubDescription(sanitizeInput(value));
-                        break;
-                    case "altitude":
-                    case "altitude [ft]":
-                        shot.setAltitude(parseDouble(value));
-                        break;
-                    case "club speed":
-                    case "club speed [mph]":
-                        shot.setClubHeadSpeed(parseDouble(value));
-                        break;
-                    case "ball speed":
-                    case "ball speed [mph]":
-                        shot.setBallSpeed(parseDouble(value));
-                        break;
-                    case "carry distance":
-                    case "carry distance [yd]":
-                        shot.setCarryDistance(parseDouble(value));
-                        break;
-                    case "total distance":
-                    case "total distance [yd]":
-                        shot.setTotalDistance(parseDouble(value));
-                        break;
-                    case "roll distance":
-                    case "roll distance [yd]":
-                        shot.setRollDistance(parseDouble(value));
-                        break;
-                    case "smash":
-                        shot.setSmash(parseDouble(value));
-                        break;
-                    case "vertical launch":
-                    case "vertical launch [deg]":
-                        shot.setLaunchAngle(parseDouble(value));
-                        break;
-                    case "peak height":
-                    case "peak height [ft]":
-                        shot.setPeakHeight(parseDouble(value));
-                        break;
-                    case "descent angle":
-                    case "descent angle [deg]":
-                        shot.setDescentAngle(parseDouble(value));
-                        break;
-                    case "horizontal launch":
-                    case "horizontal launch [deg]":
-                        shot.setHorizontalLaunch(parseDouble(value));
-                        shot.setLaunchDirection(parseDouble(value)); // Map to existing field as well
-                        break;
-                    case "carry lateral distance":
-                    case "carry lateral distance [yd]":
-                        shot.setCarryLateralDistance(parseDouble(value));
-                        break;
-                    case "total lateral distance":
-                    case "total lateral distance [yd]":
-                        shot.setTotalLateralDistance(parseDouble(value));
-                        break;
-                    case "carry curve distance":
-                    case "carry curve distance [yd]":
-                        shot.setCarryCurveDistance(parseDouble(value));
-                        break;
-                    case "total curve distance":
-                    case "total curve distance [yd]":
-                        shot.setTotalCurveDistance(parseDouble(value));
-                        break;
-                    case "attack angle":
-                    case "attack angle [deg]":
-                        shot.setAttackAngle(parseDouble(value));
-                        break;
-                    case "dynamic loft":
-                    case "dynamic loft [deg]":
-                        shot.setDynamicLoft(parseDouble(value));
-                        break;
-                    case "spin loft":
-                    case "spin loft [deg]":
-                        shot.setSpinLoft(parseDouble(value));
-                        break;
-                    case "spin rate":
-                    case "spin rate [rpm]":
-                        shot.setSpinRate(parseDouble(value));
-                        break;
-                    case "spin axis":
-                    case "spin axis [deg]":
-                        shot.setSpinAxis(parseDouble(value));
-                        break;
-                    case "low point":
-                    case "low point [in]":
-                        shot.setLowPoint(parseDouble(value));
-                        break;
-                    case "club path":
-                    case "club path [deg]":
-                        shot.setSwingPath(parseDouble(value));
-                        break;
-                    case "face path":
-                    case "face path [deg]":
-                        shot.setFaceToPath(parseDouble(value));
-                        break;
-                    case "face target":
-                    case "face target [deg]":
-                        shot.setFaceAngle(parseDouble(value));
-                        shot.setFaceTarget(parseDouble(value));
-                        break;
-                    case "swing plane tilt":
-                    case "swing plane tilt [deg]":
-                        shot.setSwingPlaneTilt(parseDouble(value));
-                        break;
-                    case "swing plane rotation":
-                    case "swing plane rotation [deg]":
-                        shot.setSwingPlaneRotation(parseDouble(value));
-                        break;
-                    case "shot classification":
-                        shot.setShotClassification(sanitizeInput(value));
-                        break;
-                }
-            } catch (NumberFormatException e) {
-                logger.warn("Error parsing value for " + header + ": " + value);
+        // Map values to shot object based on column positions (Awesome Golf format)
+        // Columns: Date,Club Type,Club Description,Altitude,Club Speed,Ball Speed,Carry Distance,Total Distance,Roll Distance,Smash,Vertical Launch,Peak Height,Descent Angle,Horizontal Launch,Carry Lateral Distance,Total Lateral Distance,Carry Curve Distance,Total Curve Distance,Attack Angle,Dynamic Loft,Spin Loft,Spin Rate,Spin Axis,Spin Reading,Low Point,Club Path,Face Path,Face Target,Swing Plane Tilt,Swing Plane Rotation,Shot Classification
+        
+        try {
+            // Column 1: Club Type
+            if (values.length > 1 && !values[1].trim().isEmpty()) {
+                shot.setClub(sanitizeInput(values[1].trim()));
             }
+            
+            // Column 2: Club Description  
+            if (values.length > 2 && !values[2].trim().isEmpty()) {
+                shot.setClubDescription(sanitizeInput(values[2].trim()));
+            }
+            
+            // Column 3: Altitude
+            if (values.length > 3 && !values[3].trim().isEmpty()) {
+                shot.setAltitude(parseDouble(values[3].trim()));
+            }
+            
+            // Column 4: Club Speed
+            if (values.length > 4 && !values[4].trim().isEmpty()) {
+                shot.setClubHeadSpeed(parseDouble(values[4].trim()));
+            }
+            
+            // Column 5: Ball Speed
+            if (values.length > 5 && !values[5].trim().isEmpty()) {
+                shot.setBallSpeed(parseDouble(values[5].trim()));
+            }
+            
+            // Column 6: Carry Distance
+            if (values.length > 6 && !values[6].trim().isEmpty()) {
+                shot.setCarryDistance(parseDouble(values[6].trim()));
+            }
+            
+            // Column 7: Total Distance
+            if (values.length > 7 && !values[7].trim().isEmpty()) {
+                shot.setTotalDistance(parseDouble(values[7].trim()));
+            }
+            
+            // Column 8: Roll Distance
+            if (values.length > 8 && !values[8].trim().isEmpty()) {
+                shot.setRollDistance(parseDouble(values[8].trim()));
+            }
+            
+            // Column 9: Smash
+            if (values.length > 9 && !values[9].trim().isEmpty()) {
+                shot.setSmash(parseDouble(values[9].trim()));
+            }
+            
+            // Column 10: Vertical Launch
+            if (values.length > 10 && !values[10].trim().isEmpty()) {
+                shot.setLaunchAngle(parseDouble(values[10].trim()));
+            }
+            
+            // Column 11: Peak Height
+            if (values.length > 11 && !values[11].trim().isEmpty()) {
+                shot.setPeakHeight(parseDouble(values[11].trim()));
+            }
+            
+            // Column 12: Descent Angle
+            if (values.length > 12 && !values[12].trim().isEmpty()) {
+                shot.setDescentAngle(parseDouble(values[12].trim()));
+            }
+            
+            // Column 13: Horizontal Launch
+            if (values.length > 13 && !values[13].trim().isEmpty()) {
+                Double horizontalLaunch = parseDouble(values[13].trim());
+                shot.setHorizontalLaunch(horizontalLaunch);
+                shot.setLaunchDirection(horizontalLaunch);
+            }
+            
+            // Column 14: Carry Lateral Distance
+            if (values.length > 14 && !values[14].trim().isEmpty()) {
+                shot.setCarryLateralDistance(parseDouble(values[14].trim()));
+            }
+            
+            // Column 15: Total Lateral Distance
+            if (values.length > 15 && !values[15].trim().isEmpty()) {
+                shot.setTotalLateralDistance(parseDouble(values[15].trim()));
+            }
+            
+            // Column 16: Carry Curve Distance
+            if (values.length > 16 && !values[16].trim().isEmpty()) {
+                shot.setCarryCurveDistance(parseDouble(values[16].trim()));
+            }
+            
+            // Column 17: Total Curve Distance
+            if (values.length > 17 && !values[17].trim().isEmpty()) {
+                shot.setTotalCurveDistance(parseDouble(values[17].trim()));
+            }
+            
+            // Column 18: Attack Angle
+            if (values.length > 18 && !values[18].trim().isEmpty()) {
+                shot.setAttackAngle(parseDouble(values[18].trim()));
+            }
+            
+            // Column 19: Dynamic Loft
+            if (values.length > 19 && !values[19].trim().isEmpty()) {
+                shot.setDynamicLoft(parseDouble(values[19].trim()));
+            }
+            
+            // Column 20: Spin Loft
+            if (values.length > 20 && !values[20].trim().isEmpty()) {
+                shot.setSpinLoft(parseDouble(values[20].trim()));
+            }
+            
+            // Column 21: Spin Rate
+            if (values.length > 21 && !values[21].trim().isEmpty()) {
+                shot.setSpinRate(parseDouble(values[21].trim()));
+            }
+            
+            // Column 22: Spin Axis
+            if (values.length > 22 && !values[22].trim().isEmpty()) {
+                shot.setSpinAxis(parseDouble(values[22].trim()));
+            }
+            
+            // Column 23: Spin Reading (text field - skip)
+            
+            // Column 24: Low Point
+            if (values.length > 24 && !values[24].trim().isEmpty()) {
+                shot.setLowPoint(parseDouble(values[24].trim()));
+            }
+            
+            // Column 25: Club Path
+            if (values.length > 25 && !values[25].trim().isEmpty()) {
+                shot.setSwingPath(parseDouble(values[25].trim()));
+            }
+            
+            // Column 26: Face Path
+            if (values.length > 26 && !values[26].trim().isEmpty()) {
+                shot.setFaceToPath(parseDouble(values[26].trim()));
+            }
+            
+            // Column 27: Face Target
+            if (values.length > 27 && !values[27].trim().isEmpty()) {
+                Double faceTarget = parseDouble(values[27].trim());
+                shot.setFaceAngle(faceTarget);
+                shot.setFaceTarget(faceTarget);
+            }
+            
+            // Column 28: Swing Plane Tilt
+            if (values.length > 28 && !values[28].trim().isEmpty()) {
+                shot.setSwingPlaneTilt(parseDouble(values[28].trim()));
+            }
+            
+            // Column 29: Swing Plane Rotation
+            if (values.length > 29 && !values[29].trim().isEmpty()) {
+                shot.setSwingPlaneRotation(parseDouble(values[29].trim()));
+            }
+            
+            // Column 30: Shot Classification
+            if (values.length > 30 && !values[30].trim().isEmpty()) {
+                shot.setShotClassification(sanitizeInput(values[30].trim()));
+            }
+            
+        } catch (NumberFormatException e) {
+            logger.warn("Error parsing numeric value in Awesome Golf shot: " + e.getMessage());
         }
         
         return shot;

@@ -1,0 +1,45 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ .Values.job.name }}-{{ .Values.job.path | replace "_" "-" }}-cleanup
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ include "jenkins_lab.name" . }}-job-cleanup
+    chart: {{ include "jenkins_lab.chart" . }}
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-weight": "-5"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  template:
+    metadata:
+      labels:
+        app: {{ include "jenkins_lab.name" . }}-job-cleanup
+        release: {{ .Release.Name }}
+    spec:
+      restartPolicy: Never
+      serviceAccountName: {{ .Values.job.name }}-cleanup
+      containers:
+      - name: job-cleanup
+        image: bitnami/kubectl:latest
+        command: ["/bin/sh"]
+        args:
+          - -c
+          - |
+            JOB_NAME="{{ .Values.job.name }}-{{ .Values.job.path | replace "_" "-" }}"
+            NAMESPACE="{{ .Release.Namespace }}"
+            
+            echo "Checking for existing job: $JOB_NAME in namespace: $NAMESPACE"
+            
+            if kubectl get job "$JOB_NAME" -n "$NAMESPACE" >/dev/null 2>&1; then
+              echo "Found existing job $JOB_NAME, deleting..."
+              kubectl delete job "$JOB_NAME" -n "$NAMESPACE" --ignore-not-found=true
+              echo "Job $JOB_NAME deleted successfully"
+            else
+              echo "No existing job $JOB_NAME found"
+            fi
+            
+            echo "Cleanup completed"
+  backoffLimit: 2

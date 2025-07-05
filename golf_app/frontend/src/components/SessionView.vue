@@ -36,6 +36,17 @@
           </router-link>
         </div>
       </div>
+
+      <!-- Session Overview Visual -->
+      <div class="overview-visual-section mb-4" ref="overviewSection">
+        <SessionOverviewVisual 
+          :shots="shots"
+          :session="session"
+          :highlighted-shot-index="highlightedShotIndex"
+          :is-minimized="isVisualMinimized"
+          @shot-highlight="handleShotHighlight"
+        />
+      </div>
       
       <!-- Data Visualization Tabs -->
       <div class="mb-4">
@@ -415,13 +426,14 @@
               </thead>
               <tbody>
                 <tr 
-                  v-for="shot in filteredShots" 
+                  v-for="(shot, index) in filteredShots" 
                   :key="shot.id"
                   class="shot-row"
+                  :class="{ 'highlighted-shot': highlightedShotIndex === index }"
                   @click="openShotDetail(shot)"
+                  @mouseenter="handleShotHover(shot, index)"
+                  @mouseleave="handleShotLeave"
                   style="cursor: pointer;"
-                  @mouseover="$event.currentTarget.style.backgroundColor = '#f8f9fa'"
-                  @mouseout="$event.currentTarget.style.backgroundColor = ''"
                 >
                   <td>
                     <i class="bi bi-eye text-primary me-1"></i>{{ shot.shotNumber }}
@@ -453,7 +465,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed, watch, nextTick } from 'vue';
+import { ref, onMounted, onUnmounted, computed, watch, nextTick } from 'vue';
 import { useRoute } from 'vue-router';
 import axios from 'axios';
 
@@ -470,6 +482,7 @@ import SmashFactorChart from './charts/SmashFactorChart.vue';
 import DescentAngleChart from './charts/DescentAngleChart.vue';
 import AccuracyStatsCard from './charts/AccuracyStatsCard.vue';
 import ShotDetailModal from './ShotDetailModal.vue';
+import SessionOverviewVisual from './SessionOverviewVisual.vue';
 
 const route = useRoute();
 const sessionId = computed(() => route.params.id);
@@ -481,6 +494,11 @@ const loading = ref(true);
 const error = ref(null);
 const clubFilter = ref('');
 const selectedShot = ref(null);
+
+// Overview visual state
+const highlightedShotIndex = ref(null);
+const isVisualMinimized = ref(false);
+const overviewSection = ref(null);
 
 // Compute filtered shots based on club filter
 const filteredShots = computed(() => {
@@ -621,6 +639,18 @@ const fetchSessionData = async () => {
   }
 };
 
+const handleShotHighlight = (index) => {
+  highlightedShotIndex.value = index;
+};
+
+const handleShotHover = (shot, index) => {
+  highlightedShotIndex.value = index;
+};
+
+const handleShotLeave = () => {
+  highlightedShotIndex.value = null;
+};
+
 const openShotDetail = (shot) => {
   selectedShot.value = shot;
   // Use Bootstrap's modal API to show the modal
@@ -631,6 +661,16 @@ const openShotDetail = (shot) => {
       modal.show();
     }
   });
+};
+
+// Scroll handling for minimizing the visual
+const handleScroll = () => {
+  if (!overviewSection.value) return;
+  
+  const rect = overviewSection.value.getBoundingClientRect();
+  const scrollThreshold = 200; // Minimize when scrolled past this point
+  
+  isVisualMinimized.value = window.scrollY > scrollThreshold;
 };
 
 const formatDate = (dateString) => {
@@ -671,6 +711,14 @@ watch(() => route.params.id, (newId) => {
 
 onMounted(() => {
   fetchSessionData();
+  
+  // Add scroll listener for visual minimization
+  window.addEventListener('scroll', handleScroll);
+});
+
+// Cleanup scroll listener when component unmounts
+onUnmounted(() => {
+  window.removeEventListener('scroll', handleScroll);
 });
 </script>
 
@@ -692,5 +740,26 @@ onMounted(() => {
 .insight-item strong {
   color: #495057;
   margin-right: 0.5rem;
+}
+
+.overview-visual-section {
+  transition: all 0.3s ease;
+}
+
+.highlighted-shot {
+  background-color: #fff3cd !important;
+  border-left: 4px solid #ffc107;
+}
+
+.highlighted-shot:hover {
+  background-color: #fff3cd !important;
+}
+
+.shot-row {
+  transition: all 0.2s ease;
+}
+
+.shot-row:hover {
+  background-color: #f8f9fa !important;
 }
 </style>

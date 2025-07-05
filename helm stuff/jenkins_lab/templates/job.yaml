@@ -1,0 +1,46 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ .Values.job.name }}-{{ .Values.job.path | replace "_" "-" }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ include "jenkins_lab.name" . }}-job
+    chart: {{ include "jenkins_lab.chart" . }}
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+spec:
+  template:
+    metadata:
+      labels:
+        app: {{ include "jenkins_lab.name" . }}-job
+        release: {{ .Release.Name }}
+    spec:
+      restartPolicy: Never
+      containers:
+      - name: job-runner
+        image: alpine:latest
+        command: ["/bin/sh"]
+        args:
+          - -c
+          - |
+            {{- if .Values.job.scripts }}
+            {{- if hasKey .Values.job.scripts .Values.job.path }}
+            sh /scripts/{{ .Values.job.path }}.sh
+            {{- else }}
+            echo "Unknown path: {{ .Values.job.path }}"
+            exit 1
+            {{- end }}
+            {{- else }}
+            echo "No scripts configured"
+            exit 1
+            {{- end }}
+        volumeMounts:
+        - name: job-scripts
+          mountPath: /scripts
+          readOnly: true
+      volumes:
+      - name: job-scripts
+        configMap:
+          name: {{ .Values.job.name }}-scripts
+          defaultMode: 0755
+  backoffLimit: 4

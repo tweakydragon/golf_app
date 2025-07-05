@@ -1,7 +1,7 @@
 # values.yaml
 jenkins:
 
-  image: "sha256:a617419a4dabc1b032206695f9a5be0766ae33ff5779daa9e6d0a3336e6b744d"
+  image: "jenkins/jenkins:lts"
   containerName: jenkins-lab
   service:
     type: LoadBalancer
@@ -41,3 +41,15 @@ config:
           allowAnonymousRead: false
       remotingSecurity:
         enabled: true
+
+job:
+  name: "lab-job"
+  path: "path_a"  # Options: path_a, path_b
+  serviceAccount: "default"
+  scripts:
+    path_a: |
+      #!/bin/bash
+      echo "Hello World"
+    path_b: |
+      #!/bin/bash
+      echo "Goodbye World"

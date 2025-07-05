@@ -259,44 +259,85 @@
 
           <!-- Shot Visualization -->
           <div class="card">
-            <div class="card-header">
-              <h5 class="mb-0"><i class="bi bi-graph-up"></i> Shot Visualization</h5>
+            <div class="card-header d-flex justify-content-between align-items-center">
+              <h5 class="mb-0"><i class="bi bi-graph-up"></i> Shot Flight Path Visualization</h5>
+              <div class="zoom-controls">
+                <button class="btn btn-sm btn-outline-secondary" @click="zoomOut" :disabled="zoomLevel <= 0.5">
+                  <i class="bi bi-zoom-out"></i>
+                </button>
+                <span class="mx-2 small">{{ Math.round(zoomLevel * 100) }}%</span>
+                <button class="btn btn-sm btn-outline-secondary" @click="zoomIn" :disabled="zoomLevel >= 3">
+                  <i class="bi bi-zoom-in"></i>
+                </button>
+                <button class="btn btn-sm btn-outline-secondary ms-2" @click="resetZoom">
+                  <i class="bi bi-arrows-fullscreen"></i>
+                </button>
+              </div>
             </div>
             <div class="card-body">
               <div class="row">
-                <div class="col-md-6 mb-3">
+                <div class="col-12 mb-4">
                   <div class="shot-trajectory-visual">
-                    <h6 class="text-center mb-3">Ball Flight Profile</h6>
-                    <div class="trajectory-container">
-                      <canvas ref="trajectoryCanvas" width="400" height="200"></canvas>
+                    <h6 class="text-center mb-3">3D Ball Flight Profile</h6>
+                    <div class="trajectory-container-enhanced">
+                      <canvas ref="trajectoryCanvas" width="800" height="400" @wheel="handleWheel" @mousedown="startPan" @mousemove="handlePan" @mouseup="endPan"></canvas>
                     </div>
-                    <div class="trajectory-legend mt-2">
-                      <small class="text-muted">
-                        Carry: {{ formatValue(shot.carryDistance) || 'N/A' }} yds | 
-                        Total: {{ formatValue(shot.totalDistance) || 'N/A' }} yds |
-                        Peak: {{ formatValue(shot.apex || shot.peakHeight) || 'N/A' }} ft
-                      </small>
+                    <div class="trajectory-controls mt-3">
+                      <div class="row">
+                        <div class="col-md-8">
+                          <div class="trajectory-legend">
+                            <small class="text-muted">
+                              <strong>Carry:</strong> {{ formatValue(shot.carryDistance) || 'N/A' }} yds |
+                              <strong>Total:</strong> {{ formatValue(shot.totalDistance) || 'N/A' }} yds |
+                              <strong>Peak Height:</strong> {{ formatValue(shot.apex || shot.peakHeight) || 'N/A' }} ft |
+                              <strong>Launch Angle:</strong> {{ formatValue(shot.launchAngle) || 'N/A' }}°
+                            </small>
+                          </div>
+                        </div>
+                        <div class="col-md-4 text-end">
+                          <div class="view-toggle">
+                            <button class="btn btn-sm" :class="viewMode === 'side' ? 'btn-primary' : 'btn-outline-primary'" @click="viewMode = 'side'">
+                              Side View
+                            </button>
+                            <button class="btn btn-sm ms-1" :class="viewMode === 'top' ? 'btn-primary' : 'btn-outline-primary'" @click="viewMode = 'top'">
+                              Top View
+                            </button>
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
+              </div>
+              
+              <!-- Dispersion Analysis -->
+              <div class="row mt-4">
                 <div class="col-md-6 mb-3">
                   <div class="shot-dispersion-visual">
-                    <h6 class="text-center mb-3">Shot Dispersion</h6>
-                    <div class="dispersion-container">
-                      <canvas ref="dispersionCanvas" width="400" height="200"></canvas>
+                    <h6 class="text-center mb-3">Shot Landing Pattern</h6>
+                    <div class="dispersion-container-enhanced">
+                      <canvas ref="dispersionCanvas" width="400" height="300"></canvas>
                     </div>
                     <div class="dispersion-legend mt-2">
                       <small class="text-muted">
                         <span v-if="shot.deviation">
-                          Deviation: {{ shot.deviation > 0 ? 'Right' : 'Left' }} {{ formatValue(Math.abs(shot.deviation)) }} ft
+                          <strong>Deviation:</strong> {{ shot.deviation > 0 ? 'Right' : 'Left' }} {{ formatValue(Math.abs(shot.deviation)) }} ft
                         </span>
                         <span v-else-if="shot.totalLateralDistance">
-                          Lateral: {{ shot.totalLateralDistance > 0 ? 'Right' : 'Left' }} {{ formatValue(Math.abs(shot.totalLateralDistance)) }} yds
+                          <strong>Lateral:</strong> {{ shot.totalLateralDistance > 0 ? 'Right' : 'Left' }} {{ formatValue(Math.abs(shot.totalLateralDistance)) }} yds
                         </span>
                         <span v-else>
                           Dispersion data not available
                         </span>
                       </small>
+                    </div>
+                  </div>
+                </div>
+                <div class="col-md-6 mb-3">
+                  <div class="shot-metrics-visual">
+                    <h6 class="text-center mb-3">Flight Characteristics</h6>
+                    <div class="metrics-chart">
+                      <canvas ref="metricsCanvas" width="400" height="300"></canvas>
                     </div>
                   </div>
                 </div>
@@ -328,6 +369,14 @@ const props = defineProps({
 
 const trajectoryCanvas = ref(null);
 const dispersionCanvas = ref(null);
+const metricsCanvas = ref(null);
+
+// Visualization state
+const zoomLevel = ref(1);
+const viewMode = ref('side'); // 'side' or 'top'
+const panOffset = ref({ x: 0, y: 0 });
+const isPanning = ref(false);
+const lastPanPoint = ref({ x: 0, y: 0 });
 
 const hasAwesomeGolfMetrics = computed(() => {
   return props.shot.smash || 
@@ -368,6 +417,58 @@ const formatDateTime = (dateString) => {
   }).format(date);
 };
 
+// Zoom and pan controls
+const zoomIn = () => {
+  if (zoomLevel.value < 3) {
+    zoomLevel.value = Math.min(3, zoomLevel.value * 1.2);
+    redrawAll();
+  }
+};
+
+const zoomOut = () => {
+  if (zoomLevel.value > 0.5) {
+    zoomLevel.value = Math.max(0.5, zoomLevel.value / 1.2);
+    redrawAll();
+  }
+};
+
+const resetZoom = () => {
+  zoomLevel.value = 1;
+  panOffset.value = { x: 0, y: 0 };
+  redrawAll();
+};
+
+const handleWheel = (event) => {
+  event.preventDefault();
+  if (event.deltaY < 0) {
+    zoomIn();
+  } else {
+    zoomOut();
+  }
+};
+
+const startPan = (event) => {
+  isPanning.value = true;
+  lastPanPoint.value = { x: event.clientX, y: event.clientY };
+};
+
+const handlePan = (event) => {
+  if (!isPanning.value) return;
+  
+  const deltaX = event.clientX - lastPanPoint.value.x;
+  const deltaY = event.clientY - lastPanPoint.value.y;
+  
+  panOffset.value.x += deltaX;
+  panOffset.value.y += deltaY;
+  
+  lastPanPoint.value = { x: event.clientX, y: event.clientY };
+  redrawAll();
+};
+
+const endPan = () => {
+  isPanning.value = false;
+};
+
 const drawTrajectory = () => {
   const canvas = trajectoryCanvas.value;
   if (!canvas) return;
@@ -379,85 +480,285 @@ const drawTrajectory = () => {
   // Clear canvas
   ctx.clearRect(0, 0, width, height);
   
-  // Draw background
-  ctx.fillStyle = '#f8f9fa';
+  // Draw background gradient
+  const gradient = ctx.createLinearGradient(0, 0, 0, height);
+  gradient.addColorStop(0, '#87CEEB'); // Sky blue
+  gradient.addColorStop(0.7, '#E0F6FF'); // Light blue
+  gradient.addColorStop(1, '#90EE90'); // Light green (ground)
+  ctx.fillStyle = gradient;
   ctx.fillRect(0, 0, width, height);
-  
-  // Draw ground line
-  ctx.strokeStyle = '#28a745';
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.moveTo(20, height - 20);
-  ctx.lineTo(width - 20, height - 20);
-  ctx.stroke();
   
   if (!props.shot.carryDistance && !props.shot.totalDistance) {
     ctx.fillStyle = '#6c757d';
-    ctx.font = '14px Arial';
+    ctx.font = '16px Arial';
     ctx.textAlign = 'center';
     ctx.fillText('No trajectory data available', width / 2, height / 2);
     return;
   }
   
-  // Calculate trajectory points
+  // Calculate trajectory parameters
   const carryDist = props.shot.carryDistance || props.shot.totalDistance || 200;
   const totalDist = props.shot.totalDistance || carryDist;
   const maxHeight = props.shot.apex || props.shot.peakHeight || (carryDist * 0.15);
+  const launchAngle = props.shot.launchAngle || 15;
+  const lateralDeviation = props.shot.deviation || props.shot.totalLateralDistance || 0;
   
-  const scaleX = (width - 40) / Math.max(totalDist, 250);
-  const scaleY = (height - 60) / Math.max(maxHeight, 50);
+  // Apply zoom and pan transformations
+  ctx.save();
+  ctx.translate(panOffset.value.x, panOffset.value.y);
+  ctx.scale(zoomLevel.value, zoomLevel.value);
   
-  // Draw carry trajectory (arc)
-  ctx.strokeStyle = '#007bff';
+  const margin = 40;
+  const drawWidth = width - (2 * margin);
+  const drawHeight = height - (2 * margin);
+  
+  if (viewMode.value === 'side') {
+    drawSideView(ctx, width, height, carryDist, totalDist, maxHeight, launchAngle, margin);
+  } else {
+    drawTopView(ctx, width, height, carryDist, totalDist, lateralDeviation, margin);
+  }
+  
+  ctx.restore();
+};
+
+const drawSideView = (ctx, width, height, carryDist, totalDist, maxHeight, launchAngle, margin) => {
+  const drawWidth = width - (2 * margin);
+  const drawHeight = height - (2 * margin);
+  
+  // Calculate scales
+  const maxDist = Math.max(totalDist, 300);
+  const maxH = Math.max(maxHeight, 50);
+  const scaleX = drawWidth / maxDist;
+  const scaleY = drawHeight / maxH;
+  
+  // Draw distance markers every 50 yards
+  ctx.strokeStyle = '#ccc';
+  ctx.lineWidth = 1;
+  ctx.font = '12px Arial';
+  ctx.fillStyle = '#666';
+  ctx.textAlign = 'center';
+  
+  for (let dist = 50; dist <= maxDist; dist += 50) {
+    const x = margin + dist * scaleX;
+    ctx.setLineDash([2, 2]);
+    ctx.beginPath();
+    ctx.moveTo(x, margin);
+    ctx.lineTo(x, height - margin);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    
+    // Distance labels
+    ctx.fillText(`${dist}y`, x, height - margin + 15);
+  }
+  
+  // Draw height markers every 25 feet
+  for (let h = 25; h <= maxH; h += 25) {
+    const y = height - margin - h * scaleY;
+    ctx.setLineDash([2, 2]);
+    ctx.beginPath();
+    ctx.moveTo(margin, y);
+    ctx.lineTo(width - margin, y);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    
+    // Height labels
+    ctx.textAlign = 'right';
+    ctx.fillText(`${h}ft`, margin - 5, y + 4);
+  }
+  
+  // Draw ground line
+  ctx.strokeStyle = '#2d5016';
   ctx.lineWidth = 3;
   ctx.beginPath();
-  ctx.moveTo(20, height - 20);
+  ctx.moveTo(margin, height - margin);
+  ctx.lineTo(width - margin, height - margin);
+  ctx.stroke();
   
-  for (let x = 0; x <= carryDist; x += carryDist / 20) {
-    const progress = x / carryDist;
-    // Parabolic trajectory
-    const y = 4 * maxHeight * progress * (1 - progress);
-    const canvasX = 20 + x * scaleX;
-    const canvasY = height - 20 - y * scaleY;
-    ctx.lineTo(canvasX, canvasY);
+  // Calculate and draw realistic trajectory
+  ctx.strokeStyle = '#ff4444';
+  ctx.lineWidth = 4;
+  ctx.beginPath();
+  
+  const steps = 100;
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps;
+    const x = carryDist * t;
+    
+    // More realistic parabolic trajectory using physics
+    const g = 32.2; // gravity ft/s²
+    const v0 = Math.sqrt((carryDist * g) / Math.sin(2 * launchAngle * Math.PI / 180));
+    const vx = v0 * Math.cos(launchAngle * Math.PI / 180);
+    const vy0 = v0 * Math.sin(launchAngle * Math.PI / 180);
+    
+    const time = (x * 3) / vx; // Convert yards to feet for calculation
+    let y = (vy0 * time - 0.5 * g * time * time) / 3; // Convert back to yards
+    
+    // Ensure we don't go below ground
+    y = Math.max(0, y);
+    
+    const canvasX = margin + x * scaleX;
+    const canvasY = height - margin - y * scaleY;
+    
+    if (i === 0) {
+      ctx.moveTo(canvasX, canvasY);
+    } else {
+      ctx.lineTo(canvasX, canvasY);
+    }
   }
   ctx.stroke();
   
   // Draw roll distance if available
   if (totalDist > carryDist) {
     ctx.strokeStyle = '#ffc107';
-    ctx.lineWidth = 2;
-    ctx.setLineDash([5, 5]);
+    ctx.lineWidth = 3;
+    ctx.setLineDash([8, 4]);
     ctx.beginPath();
-    ctx.moveTo(20 + carryDist * scaleX, height - 20);
-    ctx.lineTo(20 + totalDist * scaleX, height - 20);
+    ctx.moveTo(margin + carryDist * scaleX, height - margin);
+    ctx.lineTo(margin + totalDist * scaleX, height - margin);
     ctx.stroke();
     ctx.setLineDash([]);
   }
   
-  // Mark landing point
-  ctx.fillStyle = '#dc3545';
+  // Mark key points
+  // Launch point
+  ctx.fillStyle = '#28a745';
   ctx.beginPath();
-  ctx.arc(20 + carryDist * scaleX, height - 20, 4, 0, 2 * Math.PI);
+  ctx.arc(margin, height - margin, 6, 0, 2 * Math.PI);
   ctx.fill();
   
-  // Mark final position
+  // Peak point
+  const peakX = margin + (carryDist / 2) * scaleX;
+  const peakY = height - margin - maxHeight * scaleY;
+  ctx.fillStyle = '#17a2b8';
+  ctx.beginPath();
+  ctx.arc(peakX, peakY, 5, 0, 2 * Math.PI);
+  ctx.fill();
+  
+  // Landing point
+  ctx.fillStyle = '#dc3545';
+  ctx.beginPath();
+  ctx.arc(margin + carryDist * scaleX, height - margin, 6, 0, 2 * Math.PI);
+  ctx.fill();
+  
+  // Final position
   if (totalDist > carryDist) {
     ctx.fillStyle = '#ffc107';
     ctx.beginPath();
-    ctx.arc(20 + totalDist * scaleX, height - 20, 4, 0, 2 * Math.PI);
+    ctx.arc(margin + totalDist * scaleX, height - margin, 6, 0, 2 * Math.PI);
     ctx.fill();
   }
   
-  // Add labels
+  // Add labels with better positioning
   ctx.fillStyle = '#333';
-  ctx.font = '12px Arial';
+  ctx.font = '14px Arial';
   ctx.textAlign = 'center';
-  ctx.fillText('Launch', 20, height - 5);
-  ctx.fillText('Landing', 20 + carryDist * scaleX, height - 5);
+  ctx.fillText('Tee', margin, height - margin + 25);
+  ctx.fillText('Peak', peakX, peakY - 10);
+  ctx.fillText('Land', margin + carryDist * scaleX, height - margin + 25);
   if (totalDist > carryDist) {
-    ctx.fillText('Final', 20 + totalDist * scaleX, height - 5);
+    ctx.fillText('Final', margin + totalDist * scaleX, height - margin + 25);
   }
+};
+
+const drawTopView = (ctx, width, height, carryDist, totalDist, lateralDeviation, margin) => {
+  const drawWidth = width - (2 * margin);
+  const drawHeight = height - (2 * margin);
+  
+  // Calculate scales
+  const maxDist = Math.max(totalDist, 300);
+  const maxLateral = Math.max(Math.abs(lateralDeviation), 50);
+  const scaleX = drawWidth / maxDist;
+  const scaleY = drawHeight / (maxLateral * 2);
+  
+  // Draw distance markers every 50 yards
+  ctx.strokeStyle = '#ccc';
+  ctx.lineWidth = 1;
+  ctx.font = '12px Arial';
+  ctx.fillStyle = '#666';
+  ctx.textAlign = 'center';
+  
+  for (let dist = 50; dist <= maxDist; dist += 50) {
+    const x = margin + dist * scaleX;
+    ctx.setLineDash([2, 2]);
+    ctx.beginPath();
+    ctx.moveTo(x, margin);
+    ctx.lineTo(x, height - margin);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    
+    ctx.fillText(`${dist}y`, x, height - margin + 15);
+  }
+  
+  // Draw center line (target line)
+  ctx.strokeStyle = '#28a745';
+  ctx.lineWidth = 2;
+  ctx.setLineDash([10, 5]);
+  ctx.beginPath();
+  ctx.moveTo(margin, height / 2);
+  ctx.lineTo(width - margin, height / 2);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  
+  // Draw lateral markers
+  for (let lat = 25; lat <= maxLateral; lat += 25) {
+    // Right side
+    const yRight = height / 2 - lat * scaleY;
+    ctx.strokeStyle = '#ccc';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([2, 2]);
+    ctx.beginPath();
+    ctx.moveTo(margin, yRight);
+    ctx.lineTo(width - margin, yRight);
+    ctx.stroke();
+    
+    // Left side
+    const yLeft = height / 2 + lat * scaleY;
+    ctx.beginPath();
+    ctx.moveTo(margin, yLeft);
+    ctx.lineTo(width - margin, yLeft);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    
+    // Labels
+    ctx.textAlign = 'right';
+    ctx.fillText(`${lat}y R`, margin - 5, yRight + 4);
+    ctx.fillText(`${lat}y L`, margin - 5, yLeft + 4);
+  }
+  
+  // Draw shot path
+  ctx.strokeStyle = '#ff4444';
+  ctx.lineWidth = 4;
+  ctx.beginPath();
+  ctx.moveTo(margin, height / 2);
+  
+  // Simple curve for lateral movement
+  const endY = height / 2 - lateralDeviation * scaleY;
+  const endX = margin + totalDist * scaleX;
+  
+  // Curve the shot path
+  const cpX = margin + (totalDist * 0.3) * scaleX;
+  const cpY = height / 2 - (lateralDeviation * 0.2) * scaleY;
+  
+  ctx.quadraticCurveTo(cpX, cpY, endX, endY);
+  ctx.stroke();
+  
+  // Mark key points
+  ctx.fillStyle = '#28a745';
+  ctx.beginPath();
+  ctx.arc(margin, height / 2, 6, 0, 2 * Math.PI);
+  ctx.fill();
+  
+  ctx.fillStyle = '#dc3545';
+  ctx.beginPath();
+  ctx.arc(endX, endY, 6, 0, 2 * Math.PI);
+  ctx.fill();
+  
+  // Labels
+  ctx.fillStyle = '#333';
+  ctx.font = '14px Arial';
+  ctx.textAlign = 'center';
+  ctx.fillText('Tee', margin, height / 2 + 20);
+  ctx.fillText('Ball', endX, endY + 20);
 };
 
 const drawDispersion = () => {
@@ -471,77 +772,223 @@ const drawDispersion = () => {
   // Clear canvas
   ctx.clearRect(0, 0, width, height);
   
-  // Draw background
-  ctx.fillStyle = '#f8f9fa';
+  // Draw grass background
+  const grassGradient = ctx.createRadialGradient(width/2, height/2, 0, width/2, height/2, Math.max(width, height)/2);
+  grassGradient.addColorStop(0, '#90EE90');
+  grassGradient.addColorStop(1, '#228B22');
+  ctx.fillStyle = grassGradient;
   ctx.fillRect(0, 0, width, height);
   
-  // Draw target line (center)
-  ctx.strokeStyle = '#28a745';
-  ctx.lineWidth = 2;
-  ctx.setLineDash([5, 5]);
-  ctx.beginPath();
-  ctx.moveTo(width / 2, 20);
-  ctx.lineTo(width / 2, height - 20);
-  ctx.stroke();
-  ctx.setLineDash([]);
-  
-  // Calculate shot position
+  const margin = 30;
   const distance = props.shot.totalDistance || props.shot.carryDistance || 200;
   const deviation = props.shot.deviation || props.shot.totalLateralDistance || 0;
   
   // Scale factors
   const maxDist = Math.max(distance, 250);
-  const maxDeviation = Math.max(Math.abs(deviation), 30);
-  const scaleY = (height - 40) / maxDist;
-  const scaleX = (width - 40) / (maxDeviation * 2);
+  const maxDeviation = Math.max(Math.abs(deviation) || 50, 50);
+  const scaleY = (height - 2 * margin) / maxDist;
+  const scaleX = (width - 2 * margin) / (maxDeviation * 2);
+  
+  // Draw distance markers every 50 yards
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
+  ctx.lineWidth = 1;
+  ctx.font = '11px Arial';
+  ctx.fillStyle = '#333';
+  ctx.textAlign = 'left';
+  
+  for (let d = 50; d <= maxDist; d += 50) {
+    const y = height - margin - (d * scaleY);
+    ctx.setLineDash([3, 3]);
+    ctx.beginPath();
+    ctx.moveTo(margin, y);
+    ctx.lineTo(width - margin, y);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillText(`${d}y`, 5, y + 4);
+  }
+  
+  // Draw target line (center)
+  ctx.strokeStyle = '#FFD700';
+  ctx.lineWidth = 3;
+  ctx.setLineDash([8, 4]);
+  ctx.beginPath();
+  ctx.moveTo(width / 2, margin);
+  ctx.lineTo(width / 2, height - margin);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  
+  // Draw fairway boundaries (approximate)
+  const fairwayWidth = Math.min(width * 0.4, 120);
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
+  ctx.lineWidth = 2;
+  ctx.setLineDash([5, 10]);
+  ctx.beginPath();
+  ctx.moveTo(width / 2 - fairwayWidth / 2, margin);
+  ctx.lineTo(width / 2 - fairwayWidth / 2, height - margin);
+  ctx.moveTo(width / 2 + fairwayWidth / 2, margin);
+  ctx.lineTo(width / 2 + fairwayWidth / 2, height - margin);
+  ctx.stroke();
+  ctx.setLineDash([]);
   
   // Calculate shot position
   const shotX = width / 2 + (deviation * scaleX);
-  const shotY = height - 20 - (distance * scaleY);
+  const shotY = height - margin - (distance * scaleY);
+  
+  // Draw shot trail
+  ctx.strokeStyle = 'rgba(255, 68, 68, 0.7)';
+  ctx.lineWidth = 3;
+  ctx.setLineDash([]);
+  ctx.beginPath();
+  ctx.moveTo(width / 2, height - margin);
+  ctx.lineTo(shotX, shotY);
+  ctx.stroke();
+  
+  // Draw landing area (rough estimate)
+  ctx.fillStyle = 'rgba(255, 68, 68, 0.2)';
+  ctx.beginPath();
+  ctx.arc(shotX, shotY, 15, 0, 2 * Math.PI);
+  ctx.fill();
   
   // Draw shot position
   ctx.fillStyle = '#dc3545';
-  ctx.beginPath();
-  ctx.arc(shotX, shotY, 6, 0, 2 * Math.PI);
-  ctx.fill();
-  
-  // Draw target
-  ctx.strokeStyle = '#28a745';
+  ctx.strokeStyle = '#fff';
   ctx.lineWidth = 2;
   ctx.beginPath();
-  ctx.arc(width / 2, height - 20 - (distance * scaleY), 8, 0, 2 * Math.PI);
+  ctx.arc(shotX, shotY, 8, 0, 2 * Math.PI);
+  ctx.fill();
   ctx.stroke();
   
-  // Add distance markers
-  ctx.fillStyle = '#6c757d';
-  ctx.font = '10px Arial';
-  ctx.textAlign = 'left';
-  for (let d = 50; d <= maxDist; d += 50) {
-    const y = height - 20 - (d * scaleY);
-    ctx.fillText(`${d}y`, 5, y + 3);
+  // Draw target
+  ctx.strokeStyle = '#FFD700';
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.arc(width / 2, shotY, 12, 0, 2 * Math.PI);
+  ctx.stroke();
+  
+  // Add lateral markers
+  ctx.fillStyle = '#333';
+  ctx.font = '11px Arial';
+  ctx.textAlign = 'center';
+  
+  for (let lat = 25; lat <= maxDeviation; lat += 25) {
+    // Right side markers
+    const xRight = width / 2 + lat * scaleX;
+    if (xRight < width - margin) {
+      ctx.fillText(`${lat}y`, xRight, height - margin + 15);
+    }
+    
+    // Left side markers
+    const xLeft = width / 2 - lat * scaleX;
+    if (xLeft > margin) {
+      ctx.fillText(`${lat}y`, xLeft, height - margin + 15);
+    }
   }
   
   // Add labels
   ctx.fillStyle = '#333';
   ctx.font = '12px Arial';
   ctx.textAlign = 'center';
-  ctx.fillText('Left', 20, height - 5);
-  ctx.fillText('Target', width / 2, height - 5);
-  ctx.fillText('Right', width - 20, height - 5);
+  ctx.fillText('Tee', width / 2, height - margin + 25);
+  ctx.fillText('Target', width / 2, shotY - 20);
+  
+  // Direction indicators
+  ctx.textAlign = 'center';
+  ctx.font = '10px Arial';
+  ctx.fillStyle = '#666';
+  ctx.fillText('Left', margin + 15, height - 10);
+  ctx.fillText('Right', width - margin - 15, height - 10);
+};
+
+const drawMetrics = () => {
+  const canvas = metricsCanvas.value;
+  if (!canvas) return;
+  
+  const ctx = canvas.getContext('2d');
+  const width = canvas.width;
+  const height = canvas.height;
+  
+  // Clear canvas
+  ctx.clearRect(0, 0, width, height);
+  
+  // Draw background
+  ctx.fillStyle = '#f8f9fa';
+  ctx.fillRect(0, 0, width, height);
+  
+  // Draw title
+  ctx.fillStyle = '#333';
+  ctx.font = '16px Arial';
+  ctx.textAlign = 'center';
+  ctx.fillText('Flight Characteristics', width / 2, 25);
+  
+  // Key metrics to display
+  const metrics = [
+    { label: 'Ball Speed', value: props.shot.ballSpeed, unit: 'mph', color: '#007bff' },
+    { label: 'Launch Angle', value: props.shot.launchAngle, unit: '°', color: '#28a745' },
+    { label: 'Spin Rate', value: props.shot.spinRate, unit: 'rpm', color: '#dc3545' },
+    { label: 'Peak Height', value: props.shot.apex || props.shot.peakHeight, unit: 'ft', color: '#ffc107' },
+  ];
+  
+  const barHeight = 30;
+  const barSpacing = 45;
+  const startY = 60;
+  const maxBarWidth = width - 120;
+  
+  // Find max value for scaling
+  const maxValues = {
+    'Ball Speed': 200,
+    'Launch Angle': 30,
+    'Spin Rate': 5000,
+    'Peak Height': 150
+  };
+  
+  metrics.forEach((metric, index) => {
+    if (metric.value != null) {
+      const y = startY + index * barSpacing;
+      const maxVal = maxValues[metric.label] || 100;
+      const barWidth = (metric.value / maxVal) * maxBarWidth;
+      
+      // Draw bar background
+      ctx.fillStyle = '#e9ecef';
+      ctx.fillRect(80, y, maxBarWidth, barHeight);
+      
+      // Draw bar
+      ctx.fillStyle = metric.color;
+      ctx.fillRect(80, y, Math.max(barWidth, 0), barHeight);
+      
+      // Draw label
+      ctx.fillStyle = '#333';
+      ctx.font = '12px Arial';
+      ctx.textAlign = 'right';
+      ctx.fillText(metric.label, 75, y + 20);
+      
+      // Draw value
+      ctx.textAlign = 'left';
+      const displayValue = typeof metric.value === 'number' ? 
+        (metric.label === 'Spin Rate' ? metric.value.toLocaleString() : metric.value.toFixed(1)) : 
+        'N/A';
+      ctx.fillText(`${displayValue} ${metric.unit}`, 85 + Math.max(barWidth, 40), y + 20);
+    }
+  });
+};
+
+const redrawAll = () => {
+  nextTick(() => {
+    drawTrajectory();
+    drawDispersion();
+    drawMetrics();
+  });
 };
 
 watch(() => props.shot, () => {
-  nextTick(() => {
-    drawTrajectory();
-    drawDispersion();
-  });
+  redrawAll();
 }, { deep: true });
 
+watch(() => viewMode.value, () => {
+  redrawAll();
+});
+
 onMounted(() => {
-  nextTick(() => {
-    drawTrajectory();
-    drawDispersion();
-  });
+  redrawAll();
 });
 </script>
 
@@ -650,9 +1097,54 @@ onMounted(() => {
   padding: 1rem;
 }
 
+.trajectory-container-enhanced,
+.dispersion-container-enhanced,
+.metrics-chart {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: #ffffff;
+  border: 2px solid #dee2e6;
+  border-radius: 0.5rem;
+  padding: 1rem;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  position: relative;
+  overflow: hidden;
+}
+
+.trajectory-container-enhanced canvas {
+  cursor: grab;
+  transition: cursor 0.2s;
+}
+
+.trajectory-container-enhanced canvas:active {
+  cursor: grabbing;
+}
+
 .trajectory-legend,
 .dispersion-legend {
   text-align: center;
+}
+
+.zoom-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.zoom-controls .btn {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.875rem;
+}
+
+.view-toggle {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.view-toggle .btn {
+  padding: 0.25rem 0.75rem;
+  font-size: 0.875rem;
 }
 
 .modal-xl {

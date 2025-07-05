@@ -7,27 +7,52 @@ This project is a full-stack application for analyzing golf swing data. It featu
 
 ## Getting Started
 
-### Frontend
+### 🚀 Quick Start (Development with Live Reloading)
+
+```bash
+# Start development environment with live reloading
+./dev.sh
+```
+
+Access the application:
+- **Frontend**: http://localhost:5173 (with hot reloading)
+- **Backend API**: http://localhost:8080
+- **Database**: localhost:5432
+
+### 📋 Manual Setup Options
+
+#### Development Environment
+```bash
+# Start with live reloading
+docker-compose -f docker-compose.dev.yml up --build
+
+# Access at:
+# Frontend: http://localhost:5173
+# Backend: http://localhost:8080
+```
+
+#### Production Environment
+```bash
+# Start production build
+docker-compose up --build
+
+# Access at: http://localhost
+```
+
+#### Local Development (without Docker)
+
+**Frontend:**
 1. `cd frontend`
 2. `npm install`
 3. `npm run dev`
 
-### Backend
+**Backend:**
 1. `cd backend`
-2. `./mvnw spring-boot:run` (or use the VS Code task "Start Backend (Spring Boot)")
+2. `./mvnw spring-boot:run`
 
-### Database
-- If using Docker: `docker-compose up db` (or `docker-compose up -d db` to run in detached mode)
-- If running PostgreSQL locally (not via Docker Compose): Ensure PostgreSQL is running. The backend is configured to connect to `jdbc:postgresql://localhost:5432/golfdb` by default.
-
-### Full Stack (Docker Compose)
-1. Ensure Docker is running.
-2. From the project root, run: `docker-compose up --build`
-3. This will start three containers:
-   - PostgreSQL database (port 5432)
-   - Spring Boot backend (port 8080)
-   - Vue.js frontend served by Nginx (port 80)
-4. Access the application at http://localhost
+**Database:**
+- Use Docker: `docker-compose up db`
+- Or install PostgreSQL locally and ensure it's running on port 5432
 
 ---
 
@@ -76,9 +101,27 @@ Each session includes:
 ---
 
 ## Development
-- Frontend: Vue.js (Vite)
-- Backend: Java Spring Boot
-- Database: PostgreSQL
+
+### Technology Stack
+- **Frontend**: Vue.js (Vite) with live reloading
+- **Backend**: Java Spring Boot with DevTools
+- **Database**: PostgreSQL
+- **Containerization**: Docker & Docker Compose
+
+### Development Features
+- 🔥 **Live Reloading**: Instant updates for both frontend and backend
+- 🎯 **Hot Module Replacement**: Vue.js components update without page refresh
+- 🔄 **Auto Restart**: Spring Boot automatically restarts on Java changes
+- 📊 **Enhanced Shot Visualizations**: Interactive flight path analysis with zoom and pan
+- 🎮 **Easy Setup**: One command to start the entire development environment
+
+### Development Setup
+For detailed development instructions, see [DEVELOPMENT.md](./DEVELOPMENT.md)
+
+```bash
+# Quick start development environment
+./dev.sh
+```
 
 ### Test Data
 The application comes with sample test data that is automatically loaded into the database on startup when using Docker Compose. This data includes:
