@@ -1,0 +1,5 @@
+configuration-as-code:latest
+workflow-aggregator:latest
+git:latest
+pipeline-stage-view:latest
+blueocean:latest

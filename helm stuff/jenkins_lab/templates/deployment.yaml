@@ -1,0 +1,68 @@
+# templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-jenkins
+  labels:
+    app: jenkins
+spec:
+  replicas: 
+  selector:
+    matchLabels:
+      app: jenkins
+  template:
+    metadata:
+      labels:
+        app: jenkins
+    spec:
+      initContainers:
+        - name: plugin-installer
+          image: jenkins/jenkins:lts
+          command: 
+            - sh
+            - -c
+            - |
+              jenkins-plugin-cli --plugins-from-file /usr/share/jenkins/ref/plugins.txt
+          volumeMounts:
+            - name: jenkins-data
+              mountPath: /var/jenkins_home
+            - name: jenkins-plugins
+              mountPath: /usr/share/jenkins/ref/plugins.txt
+              subPath: plugins.txt
+              readOnly: true
+      containers:
+        - name: {{ .Values.jenkins.containerName }}
+          image: {{ .Values.jenkins.image }}
+          ports:
+            - containerPort: {{ .Values.jenkins.service.targetPort }}
+            {{- if .Values.jenkins.agentPort.enabled }}
+            - containerPort: {{ .Values.jenkins.agentPort.port }}
+            {{- end }}
+          volumeMounts:
+            - name: jenkins-data
+              mountPath: /var/jenkins_home
+            - name: docker-sock
+              mountPath: /var/run/docker.sock
+            - name: jenkins-casc-config
+              mountPath: /var/jenkins_home/casc_configs
+              readOnly: true
+          env:
+            - name: JENKINS_OPTS
+              value: "{{ .Values.jenkins.environment.JENKINS_OPTS }}"
+            - name: CASC_JENKINS_CONFIG
+              value: "/var/jenkins_home/casc_configs"
+            - name: JAVA_OPTS
+              value: "-Djenkins.install.runSetupWizard=false"
+      volumes:
+        - name: jenkins-data
+          persistentVolumeClaim:
+            claimName: {{ .Release.Name }}-jenkins-pvc
+        - name: docker-sock
+          hostPath:
+            path: /var/run/docker.sock
+        - name: jenkins-casc-config
+          configMap:
+            name: {{ .Release.Name }}-jenkins-casc
+        - name: jenkins-plugins
+          configMap:
+            name: {{ .Release.Name }}-jenkins-plugins

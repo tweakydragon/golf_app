@@ -1,0 +1,55 @@
+# values.yaml
+jenkins:
+
+  image: "jenkins/jenkins:lts"
+  containerName: jenkins-lab
+  service:
+    type: LoadBalancer
+    port: 8081
+    targetPort: 8080
+    nodePort: 30080
+  agentPort:
+    enabled: true
+    port: 50001
+  persistence:
+    enabled: true
+    size: 10Gi
+  environment:
+    JENKINS_OPTS: "--prefix=/jenkins"
+
+storage:
+  enabled: true
+  size: 1Gi
+  storageClass: standard
+  hostPath: "/Users/christopherballard/Desktop/projects/helm stuff/data"
+  
+config:
+  casc: |
+    jenkins:
+      securityRealm:
+        local:
+          allowsSignup: false
+          users:
+            - id: "lab_admin"
+              password: "lab_admin"
+              name: "Lab Admin"
+              properties:
+                - mailer:
+                    emailAddress: "lab_admin@example.com"
+      authorizationStrategy:
+        loggedInUsersCanDoAnything:
+          allowAnonymousRead: false
+      remotingSecurity:
+        enabled: true
+
+job:
+  name: "lab-job"
+  path: "path_a"  # Options: path_a, path_b
+  serviceAccount: "default"
+  scripts:
+    path_a: |
+      #!/bin/bash
+      echo "Hello World"
+    path_b: |
+      #!/bin/bash
+      echo "Goodbye World"
