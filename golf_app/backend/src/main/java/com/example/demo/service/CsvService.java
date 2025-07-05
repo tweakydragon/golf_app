@@ -1,5 +1,8 @@
 package com.example.demo.service;
 
+import com.example.demo.exception.FileProcessingException;
+import com.example.demo.exception.InvalidFileFormatException;
+import com.example.demo.exception.ValidationException;
 import com.example.demo.model.Session;
 import com.example.demo.model.Shot;
 import com.example.demo.repository.SessionRepository;
@@ -39,11 +42,11 @@ public class CsvService {
      */
     public Session processGarminR10Csv(MultipartFile file, String title, String location) throws IOException {
         if (file.isEmpty()) {
-            throw new IllegalArgumentException("File is empty");
+            throw new InvalidFileFormatException("File is empty");
         }
         
         if (!isValidCsvFile(file)) {
-            throw new IllegalArgumentException("Invalid file format. Please upload a CSV file");
+            throw new InvalidFileFormatException("Invalid file format. Please upload a CSV file");
         }
         
         // Sanitize inputs
@@ -51,7 +54,7 @@ public class CsvService {
         String sanitizedLocation = sanitizeInput(location);
         
         if (sanitizedTitle.isEmpty()) {
-            throw new IllegalArgumentException("Title cannot be empty");
+            throw new ValidationException("Title cannot be empty");
         }
         
         Session session = new Session(sanitizedTitle);
@@ -99,7 +102,7 @@ public class CsvService {
         
         // Save only if we have at least one valid shot
         if (session.getShots().isEmpty()) {
-            throw new IllegalArgumentException("No valid shots found in the CSV file");
+            throw new ValidationException("No valid shots found in the CSV file");
         }
         
         // Try to extract a date from the first shot or set to current date
@@ -277,11 +280,11 @@ public class CsvService {
     public Session processAwesomeGolfCsv(MultipartFile file, String title, String location) throws IOException {
         
         if (file.isEmpty()) {
-            throw new IllegalArgumentException("File is empty");
+            throw new InvalidFileFormatException("File is empty");
         }
         
         if (!isValidCsvFile(file)) {
-            throw new IllegalArgumentException("Invalid file format. Please upload a CSV file");
+            throw new InvalidFileFormatException("Invalid file format. Please upload a CSV file");
         }
         
         // Sanitize inputs
@@ -289,7 +292,7 @@ public class CsvService {
         String sanitizedLocation = sanitizeInput(location);
         
         if (sanitizedTitle.isEmpty()) {
-            throw new IllegalArgumentException("Title cannot be empty");
+            throw new ValidationException("Title cannot be empty");
         }
         
         Session session = new Session(sanitizedTitle);
@@ -358,7 +361,7 @@ public class CsvService {
         
         // Save only if we have at least one valid shot
         if (session.getShots().isEmpty()) {
-            throw new IllegalArgumentException("No valid shots found in the CSV file");
+            throw new ValidationException("No valid shots found in the CSV file");
         }
         
         return sessionRepository.save(session);
