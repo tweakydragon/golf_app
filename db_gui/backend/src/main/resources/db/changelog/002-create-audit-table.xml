@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.9.xsd">
+
+    <changeSet id="002-create-audit-table" author="system">
+        <comment>Create audit table for tracking customer changes</comment>
+        
+        <!-- Create audit schema if it doesn't exist -->
+        <sql>CREATE SCHEMA IF NOT EXISTS audit;</sql>
+        
+        <!-- Create audit table -->
+        <createTable tableName="customer_audit" schemaName="audit">
+            <column name="id" type="BIGSERIAL">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="customer_id" type="BIGINT">
+                <constraints nullable="false"/>
+            </column>
+            <column name="action" type="VARCHAR(20)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="changed_by" type="VARCHAR(100)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="changed_at" type="TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+            <column name="old_values" type="JSONB">
+                <constraints nullable="true"/>
+            </column>
+            <column name="new_values" type="JSONB">
+                <constraints nullable="true"/>
+            </column>
+        </createTable>
+        
+        <!-- Create indexes for audit table -->
+        <createIndex tableName="customer_audit" schemaName="audit" indexName="idx_audit_customer_id">
+            <column name="customer_id"/>
+        </createIndex>
+        
+        <createIndex tableName="customer_audit" schemaName="audit" indexName="idx_audit_changed_at">
+            <column name="changed_at"/>
+        </createIndex>
+        
+        <createIndex tableName="customer_audit" schemaName="audit" indexName="idx_audit_action">
+            <column name="action"/>
+        </createIndex>
+        
+        <rollback>
+            <dropTable tableName="customer_audit" schemaName="audit"/>
+            <sql>DROP SCHEMA IF EXISTS audit CASCADE;</sql>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

@@ -1,0 +1,18 @@
+const { defineConfig } = require('@vue/cli-service')
+
+module.exports = defineConfig({
+  transpileDependencies: true,
+  lintOnSave: false,
+  devServer: {
+    host: '0.0.0.0',
+    port: 3000,
+    allowedHosts: 'all'
+  },
+  configureWebpack: {
+    resolve: {
+      alias: {
+        '@': require('path').resolve(__dirname, 'src')
+      }
+    }
+  }
+})

@@ -1,0 +1,126 @@
+# Prometheus Alert Rules for Golf App
+# These rules define when to trigger alerts based on metrics
+
+groups:
+  - name: golf-app-alerts
+    rules:
+      # High CPU usage
+      - alert: HighCPUUsage
+        expr: (100 - (avg(rate(cpu_usage_idle[5m])) * 100)) > 80
+        for: 5m
+        labels:
+          severity: warning
+          service: system
+        annotations:
+          summary: "High CPU usage detected"
+          description: "CPU usage is above 80% for more than 5 minutes"
+
+      # High memory usage
+      - alert: HighMemoryUsage
+        expr: (memory_usage_percent) > 90
+        for: 5m
+        labels:
+          severity: critical
+          service: system
+        annotations:
+          summary: "High memory usage detected"
+          description: "Memory usage is above 90% for more than 5 minutes"
+
+      # Application down
+      - alert: ApplicationDown
+        expr: up{job="golf-backend"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: backend
+        annotations:
+          summary: "Golf App backend is down"
+          description: "The Golf App backend has been down for more than 1 minute"
+
+      # Database connection issues
+      - alert: DatabaseConnectionHigh
+        expr: postgres_connections_active / postgres_connections_max > 0.8
+        for: 2m
+        labels:
+          severity: warning
+          service: database
+        annotations:
+          summary: "High database connection usage"
+          description: "Database connection usage is above 80% for more than 2 minutes"
+
+      # Slow response times
+      - alert: SlowResponseTime
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 2
+        for: 5m
+        labels:
+          severity: warning
+          service: backend
+        annotations:
+          summary: "Slow response times detected"
+          description: "95th percentile response time is above 2 seconds for more than 5 minutes"
+
+      # High error rate
+      - alert: HighErrorRate
+        expr: rate(http_requests_total{status=~"5.."}[5m]) / rate(http_requests_total[5m]) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+          service: backend
+        annotations:
+          summary: "High error rate detected"
+          description: "Error rate is above 5% for more than 5 minutes"
+
+      # Disk space low
+      - alert: DiskSpaceLow
+        expr: (disk_free_bytes / disk_total_bytes) < 0.1
+        for: 5m
+        labels:
+          severity: critical
+          service: system
+        annotations:
+          summary: "Low disk space"
+          description: "Less than 10% disk space remaining"
+
+      # Redis down
+      - alert: RedisDown
+        expr: up{job="redis"} == 0
+        for: 1m
+        labels:
+          severity: warning
+          service: redis
+        annotations:
+          summary: "Redis is down"
+          description: "Redis has been down for more than 1 minute"
+
+      # Database backup failure
+      - alert: DatabaseBackupFailed
+        expr: increase(database_backup_failures_total[1h]) > 0
+        for: 1m
+        labels:
+          severity: critical
+          service: database
+        annotations:
+          summary: "Database backup failed"
+          description: "Database backup has failed in the last hour"
+
+      # JVM memory issues
+      - alert: JVMMemoryHigh
+        expr: jvm_memory_used_bytes / jvm_memory_max_bytes > 0.9
+        for: 5m
+        labels:
+          severity: warning
+          service: backend
+        annotations:
+          summary: "JVM memory usage high"
+          description: "JVM memory usage is above 90% for more than 5 minutes"
+
+      # Too many GC pauses
+      - alert: HighGCPauses
+        expr: rate(jvm_gc_pause_seconds_count[5m]) > 1
+        for: 5m
+        labels:
+          severity: warning
+          service: backend
+        annotations:
+          summary: "High GC pause frequency"
+          description: "More than 1 GC pause per second for more than 5 minutes"
