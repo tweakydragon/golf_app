@@ -7,27 +7,52 @@ This project is a full-stack application for analyzing golf swing data. It featu
 
 ## Getting Started
 
-### Frontend
+### 🚀 Quick Start (Development with Live Reloading)
+
+```bash
+# Start development environment with live reloading
+./dev.sh
+```
+
+Access the application:
+- **Frontend**: http://localhost:5173 (with hot reloading)
+- **Backend API**: http://localhost:8080
+- **Database**: localhost:5432
+
+### 📋 Manual Setup Options
+
+#### Development Environment
+```bash
+# Start with live reloading
+docker-compose -f docker-compose.dev.yml up --build
+
+# Access at:
+# Frontend: http://localhost:5173
+# Backend: http://localhost:8080
+```
+
+#### Production Environment
+```bash
+# Start production build
+docker-compose up --build
+
+# Access at: http://localhost
+```
+
+#### Local Development (without Docker)
+
+**Frontend:**
 1. `cd frontend`
 2. `npm install`
 3. `npm run dev`
 
-### Backend
+**Backend:**
 1. `cd backend`
-2. `./mvnw spring-boot:run` (or use the VS Code task "Start Backend (Spring Boot)")
+2. `./mvnw spring-boot:run`
 
-### Database
-- If using Docker: `docker-compose up db` (or `docker-compose up -d db` to run in detached mode)
-- If running PostgreSQL locally (not via Docker Compose): Ensure PostgreSQL is running. The backend is configured to connect to `jdbc:postgresql://localhost:5432/golfdb` by default.
-
-### Full Stack (Docker Compose)
-1. Ensure Docker is running.
-2. From the project root, run: `docker-compose up --build`
-3. This will start three containers:
-   - PostgreSQL database (port 5432)
-   - Spring Boot backend (port 8080)
-   - Vue.js frontend served by Nginx (port 80)
-4. Access the application at http://localhost
+**Database:**
+- Use Docker: `docker-compose up db`
+- Or install PostgreSQL locally and ensure it's running on port 5432
 
 ---
 
@@ -66,43 +91,37 @@ The application will automatically parse your shot data including:
 - Shot classification
 - And many more advanced club and ball metrics
 
-## Data Analysis & Visualization
+## Data Analysis
 Each session includes:
 - Overall session statistics
 - Club-by-club breakdown of performance
 - Individual shot details
 - Advanced metrics and analytics
 
-### Shot Visualizations
-The application provides comprehensive visual representations of your shots:
-- **Top-Down View**: View all shots plotted on a virtual driving range from above, showing the dispersion pattern and distance relative to target. This view utilizes Chart.js to create an accurate scatter plot of your shots.
-- **Side-On View**: See the trajectory of each shot from a side perspective, showing the launch angle, apex height, and distance. The parabolic flight path is calculated based on shot metrics including launch angle and apex height.
-- **Interactive Features**:
-  - Filter visualizations by club to focus on specific parts of your game
-  - Interactive tooltips provide detailed metrics for each shot when hovering
-  - Color coding based on club type for easy visual differentiation
-- **Data Handling**: The visualization system is robust and handles missing or incomplete data by using intelligent defaults based on club type and available metrics.
-
 ---
 
 ## Development
-- Frontend: Vue.js (Vite) with Chart.js for data visualization
-- Backend: Java Spring Boot
-- Database: PostgreSQL
 
-### Data Visualization System
-The shot data visualizations are built using:
-- **Chart.js**: Core charting library that provides responsive, interactive charts
-- **Vue Component Architecture**: Separate components for different visualization types (TopDownView, SideView)
-- **Reactive Data Binding**: Visualizations automatically update when filtering or when new data is available
-- **Mathematical Models**: Flight trajectories are calculated using physics-based parabolic models derived from launch monitor metrics
+### Technology Stack
+- **Frontend**: Vue.js (Vite) with live reloading
+- **Backend**: Java Spring Boot with DevTools
+- **Database**: PostgreSQL
+- **Containerization**: Docker & Docker Compose
 
-#### Adding New Visualizations
-To add a new visualization type:
-1. Create a new Vue component in the `frontend/src/components/` directory
-2. Import and use Chart.js or D3.js as needed
-3. Add the component to SessionView.vue and pass the necessary props
-4. Update CSS styling in the component's `<style>` section to ensure proper display
+### Development Features
+- 🔥 **Live Reloading**: Instant updates for both frontend and backend
+- 🎯 **Hot Module Replacement**: Vue.js components update without page refresh
+- 🔄 **Auto Restart**: Spring Boot automatically restarts on Java changes
+- 📊 **Enhanced Shot Visualizations**: Interactive flight path analysis with zoom and pan
+- 🎮 **Easy Setup**: One command to start the entire development environment
+
+### Development Setup
+For detailed development instructions, see [DEVELOPMENT.md](./DEVELOPMENT.md)
+
+```bash
+# Quick start development environment
+./dev.sh
+```
 
 ### Test Data
 The application comes with sample test data that is automatically loaded into the database on startup when using Docker Compose. This data includes:
