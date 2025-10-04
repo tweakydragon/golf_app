@@ -34,9 +34,9 @@ public class Session {
     @Schema(description = "Location where the session was recorded", example = "Driving Range")
     private String location;
     
-    @Pattern(regexp = "^(GARMIN_R10|AWESOME_GOLF)$", message = "Source type must be either GARMIN_R10 or AWESOME_GOLF")
-    @Schema(description = "Source type of the session data", example = "GARMIN_R10", allowableValues = {"GARMIN_R10", "AWESOME_GOLF"})
-    private String sourceType;  // "GARMIN_R10" or "AWESOME_GOLF"
+    @Enumerated(EnumType.STRING)
+    @Schema(description = "Source type of the session data", example = "GARMIN_R10")
+    private DataSource sourceType;
     
     @OneToMany(mappedBy = "session", cascade = CascadeType.ALL, orphanRemoval = true)
     @Schema(description = "List of shots in this session")
@@ -92,13 +92,8 @@ public class Session {
         this.location = location;
     }
 
-    public String getSourceType() {
-        return sourceType;
-    }
-
-    public void setSourceType(String sourceType) {
-        this.sourceType = sourceType;
-    }
+    public DataSource getSourceType() { return sourceType; }
+    public void setSourceType(DataSource sourceType) { this.sourceType = sourceType; }
 
     public List<Shot> getShots() {
         return shots;

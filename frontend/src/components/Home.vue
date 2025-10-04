@@ -82,6 +82,30 @@ const loading = ref(true);
 const error = ref(null);
 const searchQuery = ref('');
 let searchTimeout = null;
+const unwrapSessionList = (payload) => {
+  if (!payload) {
+    return [];
+  }
+
+  if (Array.isArray(payload)) {
+    return payload;
+  }
+
+  if (typeof payload === 'object') {
+    if (payload.success === false) {
+      const error = new Error(payload.message || 'Failed to load sessions. Please try again later.');
+      error.code = payload.errorCode;
+      throw error;
+    }
+
+    if (Array.isArray(payload.data)) {
+      return payload.data;
+    }
+  }
+
+  return [];
+};
+
 
 const fetchSessions = async () => {
   loading.value = true;
@@ -89,10 +113,12 @@ const fetchSessions = async () => {
   
   try {
     const response = await axios.get('http://localhost:8080/api/sessions');
-    sessions.value = response.data;
+    const payload = response.data;
+    sessions.value = unwrapSessionList(payload);
   } catch (err) {
     console.error('Error fetching sessions:', err);
-    error.value = 'Failed to load sessions. Please try again later.';
+    const message = err.response?.data?.message || err.message || 'Failed to load sessions. Please try again later.';
+    error.value = message;
   } finally {
     loading.value = false;
   }
@@ -115,10 +141,12 @@ const searchSessions = () => {
       }
       
       const response = await axios.get(endpoint);
-      sessions.value = response.data;
+      const payload = response.data;
+      sessions.value = unwrapSessionList(payload);
     } catch (err) {
       console.error('Error searching sessions:', err);
-      error.value = 'Failed to search sessions. Please try again later.';
+      const message = err.response?.data?.message || err.message || 'Failed to search sessions. Please try again later.';
+      error.value = message;
     } finally {
       loading.value = false;
     }

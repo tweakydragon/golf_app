@@ -1,0 +1,4 @@
+Date,Club Type,Club Description,Altitude,Club Speed,Ball Speed,Carry Distance,Total Distance,Roll Distance,Smash,Vertical Launch,Peak Height,Descent Angle,Horizontal Launch,Carry Lateral Distance,Total Lateral Distance,Carry Curve Distance,Total Curve Distance,Attack Angle,Dynamic Loft,Spin Loft,Spin Rate,Spin Axis,Spin Reading,Low Point,Club Path,Face Path,Face Target,Swing Plane Tilt,Swing Plane Rotation,Shot Classification
+(misc units row ignored for parsing,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,)
+2025-05-14 10:01:00,Driver,TaylorMade M6 Driver 10.5,1200,105.0,150.0,250.0,270.0,20.0,1.43,13.0,90.0,45.0,2.0,5.0,5.5,12.0,12.5,-1.5,15.0,12.0,2500,10.0,OK,-0.5,2.3,-0.2,0.8,55.0,25.0,Push Slice
+2025-05-14 10:05:00,Driver,TaylorMade M6 Driver 10.5,1200,104.0,149.0,248.0,268.0,19.0,1.43,12.8,88.0,44.0,1.5,4.0,4.5,11.0,11.5,-1.6,14.8,11.8,2480,9.0,OK,-0.4,2.1,-0.1,0.7,54.8,24.5,Push Fade

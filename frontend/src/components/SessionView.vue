@@ -495,6 +495,27 @@ const error = ref(null);
 const clubFilter = ref('');
 const selectedShot = ref(null);
 
+  const unwrapApiResponse = (payload) => {
+    if (!payload) {
+      return null;
+    }
+
+    if (typeof payload === 'object' && payload !== null) {
+      if ('success' in payload && payload.success === false) {
+        const apiError = new Error(payload.message || 'Failed to load session data.');
+        apiError.code = payload.errorCode;
+        throw apiError;
+      }
+
+      if ('data' in payload) {
+        return payload.data;
+      }
+    }
+
+    return payload;
+  };
+
+
 // Overview visual state
 const highlightedShotIndex = ref(null);
 const isVisualMinimized = ref(false);
@@ -622,7 +643,7 @@ const fetchSessionData = async () => {
   try {
     // Fetch session details
     const sessionResponse = await axios.get(`http://localhost:8080/api/sessions/${sessionId.value}`);
-    session.value = sessionResponse.data;
+    session.value = unwrapApiResponse(sessionResponse.data);
     
     // Fetch session shots
     const shotsResponse = await axios.get(`http://localhost:8080/api/sessions/${sessionId.value}/shots`);
@@ -633,7 +654,8 @@ const fetchSessionData = async () => {
     stats.value = statsResponse.data;
   } catch (err) {
     console.error('Error fetching session data:', err);
-    error.value = 'Failed to load session data. Please try again later.';
+    const message = err.response?.data?.message || err.message || 'Failed to load session data. Please try again later.';
+    error.value = message;
   } finally {
     loading.value = false;
   }

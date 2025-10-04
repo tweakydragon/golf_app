@@ -1,31 +1,18 @@
 <template>
-  <div class="chart-container">
-    <canvas ref="chartCanvas"></canvas>
-  </div>
+  <BaseChart
+    v-if="hasData"
+    type="doughnut"
+    :data="chartData"
+    :options="chartOptions"
+    :height="320"
+  />
+  <div v-else class="chart-empty">No club usage data available.</div>
 </template>
 
 <script setup>
-import { ref, onMounted, watch, nextTick } from 'vue';
-import {
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  BarElement,
-  Title,
-  Tooltip,
-  Legend,
-  ArcElement
-} from 'chart.js';
-
-ChartJS.register(
-  CategoryScale,
-  LinearScale,
-  BarElement,
-  Title,
-  Tooltip,
-  Legend,
-  ArcElement
-);
+import { computed } from 'vue';
+import BaseChart from './BaseChart.vue';
+import { getChartPalette, resolveToken } from '../../theme/palette';
 
 const props = defineProps({
   clubCounts: {
@@ -34,92 +21,74 @@ const props = defineProps({
   }
 });
 
-const chartCanvas = ref(null);
-let chartInstance = null;
+const clubs = computed(() => Object.keys(props.clubCounts || {}));
+const counts = computed(() => clubs.value.map((club) => props.clubCounts[club] || 0));
 
-const createChart = () => {
-  if (!chartCanvas.value || !props.clubCounts) return;
-  
-  // Destroy existing chart if it exists
-  if (chartInstance) {
-    chartInstance.destroy();
+const hasData = computed(() => counts.value.some((value) => value > 0));
+
+const chartData = computed(() => {
+  if (!hasData.value) {
+    return { labels: [], datasets: [] };
   }
-  
-  const clubs = Object.keys(props.clubCounts);
-  const counts = Object.values(props.clubCounts);
-  
-  if (clubs.length === 0) {
-    return;
-  }
-  
-  const ctx = chartCanvas.value.getContext('2d');
-  
-  chartInstance = new ChartJS(ctx, {
-    type: 'doughnut',
-    data: {
-      labels: clubs,
-      datasets: [{
-        data: counts,
-        backgroundColor: [
-          '#FF6384',
-          '#36A2EB',
-          '#FFCE56',
-          '#4BC0C0',
-          '#9966FF',
-          '#FF9F40',
-          '#FF6384',
-          '#C9CBCF',
-          '#4BC0C0',
-          '#FF6384'
-        ],
+
+  const colors = getChartPalette(clubs.value.length);
+
+  return {
+    labels: clubs.value,
+    datasets: [
+      {
+        data: counts.value,
+        backgroundColor: colors,
+        borderColor: resolveToken('--color-surface', '#ffffff'),
         borderWidth: 2,
-        borderColor: '#fff'
-      }]
+        hoverOffset: 8
+      }
+    ]
+  };
+});
+
+const chartOptions = computed(() => ({
+  responsive: true,
+  maintainAspectRatio: false,
+  cutout: '55%',
+  plugins: {
+    legend: {
+      position: 'bottom',
+      labels: {
+        padding: 20,
+        usePointStyle: true
+      }
     },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: {
-        legend: {
-          position: 'bottom',
-          labels: {
-            padding: 20,
-            usePointStyle: true
-          }
-        },
-        tooltip: {
-          callbacks: {
-            label: (context) => {
-              const label = context.label;
-              const value = context.parsed;
-              const total = context.dataset.data.reduce((a, b) => a + b, 0);
-              const percentage = ((value / total) * 100).toFixed(1);
-              return `${label}: ${value} shots (${percentage}%)`;
-            }
-          }
+    tooltip: {
+      callbacks: {
+        label: (context) => {
+          const label = context.label;
+          const value = context.parsed;
+          const total = context.dataset.data.reduce((sum, current) => sum + current, 0);
+          const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : '0.0';
+          return `${label}: ${value} shots (${percentage}%)`;
         }
       }
     }
-  });
-};
-
-watch(() => props.clubCounts, () => {
-  nextTick(() => {
-    createChart();
-  });
-}, { deep: true });
-
-onMounted(() => {
-  nextTick(() => {
-    createChart();
-  });
-});
+  },
+  animation: {
+    animateRotate: true,
+    animateScale: true,
+    duration: 600,
+    easing: 'easeOutQuint'
+  }
+}));
 </script>
 
 <style scoped>
-.chart-container {
-  position: relative;
-  height: 300px;
-  width: 100%;
+.chart-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 320px;
+  border: 1px dashed var(--color-border);
+  border-radius: 12px;
+  color: var(--color-muted);
+  font-size: 0.95rem;
 }
 </style>

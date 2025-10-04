@@ -1,45 +1,79 @@
 <script setup>
 import { ref, onMounted, onBeforeUnmount } from 'vue';
-import { useRouter } from 'vue-router';
-
-const router = useRouter();
 
 const isMenuOpen = ref(false);
 const isPinned = ref(false);
-let menuHoverTimeout = null;
+let hoverTimer = null;
 
-const toggleMenu = () => {
-  isMenuOpen.value = !isMenuOpen.value;
+const openMenu = () => {
+  isMenuOpen.value = true;
 };
 
-const closeMenu = () => {
-  if (!isPinned.value) {
+const toggleMenu = () => {
+  if (isMenuOpen.value) {
+    closeMenu(true);
+  } else {
+    openMenu();
+  }
+};
+
+const closeMenu = (force = false) => {
+  if (force || !isPinned.value) {
     isMenuOpen.value = false;
   }
 };
 
-const keepMenuOpen = () => {
-  if (menuHoverTimeout) {
-    clearTimeout(menuHoverTimeout);
+const clearHoverTimer = () => {
+  if (hoverTimer) {
+    clearTimeout(hoverTimer);
+    hoverTimer = null;
   }
 };
 
-const autoCloseMenu = () => {
+const scheduleClose = () => {
   if (!isPinned.value && isMenuOpen.value) {
-    menuHoverTimeout = setTimeout(() => {
+    clearHoverTimer();
+    hoverTimer = setTimeout(() => {
       isMenuOpen.value = false;
-    }, 300); // Adjust delay as needed
+      hoverTimer = null;
+    }, 250);
   }
+};
+
+const onMenuHover = () => {
+  clearHoverTimer();
+  openMenu();
+};
+
+const onMenuLeave = () => {
+  scheduleClose();
 };
 
 const togglePin = () => {
   isPinned.value = !isPinned.value;
+  if (!isPinned.value) {
+    scheduleClose();
+  }
 };
 
-// Optional: Close menu on Escape key press
 const handleEsc = (event) => {
   if (event.key === 'Escape' && isMenuOpen.value && !isPinned.value) {
-    closeMenu();
+    closeMenu(true);
+  }
+};
+
+const handleFocusIn = () => {
+  onMenuHover();
+};
+
+const handleFocusOut = (event) => {
+  if (isPinned.value) {
+    return;
+  }
+  const menu = event.currentTarget;
+  const related = event.relatedTarget;
+  if (!menu.contains(related)) {
+    scheduleClose();
   }
 };
 
@@ -49,190 +83,238 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   document.removeEventListener('keydown', handleEsc);
-  if (menuHoverTimeout) {
-    clearTimeout(menuHoverTimeout);
-  }
+  clearHoverTimer();
 });
 </script>
 
 <template>
   <div id="app-container">
-    <!-- Golf Menu Button -->
     <button
-      class="golf-ball-button"
+      type="button"
+      class="menu-toggle"
       @click="toggleMenu"
+      :aria-expanded="isMenuOpen"
+      aria-controls="side-menu"
       aria-label="Toggle navigation"
     >
-      <div class="golf-ball-icon">
-        <div></div><!-- Middle line of the hamburger icon -->
-      </div>
+      <span class="menu-toggle__line"></span>
+      <span class="menu-toggle__line"></span>
+      <span class="menu-toggle__line"></span>
     </button>
 
-    <!-- Slide-out Menu -->
-    <div 
-      class="side-menu" 
-      :class="{ open: isMenuOpen }"
-      @mouseenter="keepMenuOpen"
-      @mouseleave="autoCloseMenu"
+    <div
+      v-if="isMenuOpen && !isPinned"
+      class="side-menu-backdrop"
+      @click="closeMenu(true)"
+      aria-hidden="true"
+    ></div>
+
+    <nav
+      id="side-menu"
+      class="side-menu"
+      :class="{ open: isMenuOpen, pinned: isPinned }"
+      @mouseenter="onMenuHover"
+      @mouseleave="onMenuLeave"
+      @focusin="handleFocusIn"
+      @focusout="handleFocusOut"
     >
-      <div class="side-menu-header">
-        <h5>Menu</h5>
-        <div class="button-group">
+      <div class="side-menu__header">
+        <h5 class="side-menu__title">Menu</h5>
+        <div class="side-menu__actions">
           <button
-            class="pin-button"
+            type="button"
+            class="icon-button"
             @click="togglePin"
-            :class="{ pinned: isPinned }"
+            :aria-pressed="isPinned"
             aria-label="Pin menu"
           >
-            📌
+            <i :class="['bi', isPinned ? 'bi-pin-angle-fill' : 'bi-pin-angle']"></i>
           </button>
           <button
-            class="close-button"
-            @click="closeMenu"
+            type="button"
+            class="icon-button"
+            @click="closeMenu(true)"
             aria-label="Close menu"
           >
-            ✖
+            <i class="bi bi-x-lg"></i>
           </button>
         </div>
       </div>
-      <div class="side-menu-content">
+      <div class="side-menu__content">
         <ul class="menu-items">
           <li>
-            <router-link to="/" class="nav-link" @click="closeMenu">Home</router-link>
+            <router-link to="/" class="nav-link" @click="closeMenu(true)">Home</router-link>
           </li>
           <li>
-            <router-link to="/upload" class="nav-link" @click="closeMenu">Upload CSV</router-link>
+            <router-link to="/upload" class="nav-link" @click="closeMenu(true)">Upload CSV</router-link>
           </li>
         </ul>
       </div>
-    </div>
+    </nav>
 
-    <!-- Main Content Area - Router View -->
-    <div class="main-content">
+    <main class="main-content">
       <router-view />
-    </div>
+    </main>
   </div>
 </template>
 
 <style>
-/* Golf Ball Button */
-.golf-ball-button {
+#app-container {
+  min-height: 100vh;
+}
+
+.menu-toggle {
   position: fixed;
   top: 20px;
   left: 20px;
-  width: 50px;
-  height: 50px;
-  border-radius: 5px;
-  background-color: white;
-  border: 1px solid #ccc;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.12);
   cursor: pointer;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  z-index: 1000;
+  gap: 6px;
+  z-index: 1100;
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
 }
 
-.golf-ball-button:hover {
-  background-color: #f8f9fa;
+.menu-toggle:hover,
+.menu-toggle:focus-visible {
+  transform: translateY(-1px);
+  box-shadow: 0 14px 35px rgba(15, 23, 42, 0.18);
+  outline: none;
 }
 
-/* Replace golf ball icon with hamburger lines */
-.golf-ball-icon {
+.menu-toggle__line {
   width: 24px;
-  height: 18px;
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
+  height: 2px;
+  background-color: #212529;
+  border-radius: 2px;
 }
 
-.golf-ball-icon::before,
-.golf-ball-icon::after,
-.golf-ball-icon div {
-  content: '';
-  background-color: #333;
-  height: 3px;
-  width: 100%;
-  border-radius: 3px;
+.side-menu-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.35);
+  backdrop-filter: blur(2px);
+  z-index: 1040;
 }
 
-/* Side Menu */
 .side-menu {
   position: fixed;
   top: 0;
-  left: -250px; /* Start off-screen */
-  width: 250px;
+  left: 0;
+  width: 280px;
+  max-width: 90vw;
   height: 100vh;
-  background-color: white;
-  box-shadow: 2px 0 5px rgba(0,0,0,0.1);
-  transition: left 0.3s ease;
+  background-color: var(--color-surface);
+  border-right: 1px solid var(--color-border);
+  box-shadow: 0 0 40px rgba(15, 23, 42, 0.16);
+  padding: 20px 20px 32px;
+  transform: translateX(-100%);
+  transition: transform 0.3s ease;
   z-index: 1050;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
 }
 
 .side-menu.open {
-  left: 0; /* Slide in */
+  transform: translateX(0);
 }
 
-.side-menu-header {
-  padding: 15px;
-  border-bottom: 1px solid #eee;
+.side-menu.pinned {
+  box-shadow: none;
+}
+
+.side-menu__header {
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  justify-content: space-between;
+  gap: 12px;
 }
 
-.side-menu-header h5 {
+.side-menu__title {
   margin: 0;
-  font-size: 1.25rem;
+  font-size: 1.1rem;
 }
 
-.button-group {
+.side-menu__actions {
   display: flex;
-  gap: 10px;
+  align-items: center;
+  gap: 8px;
 }
 
-.pin-button, .close-button {
-  background: none;
-  border: none;
+.icon-button {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background-color: var(--color-surface-alt);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-muted);
   cursor: pointer;
-  font-size: 16px;
+  transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
 }
 
-.pin-button.pinned {
-  color: #0d6efd; /* Bootstrap primary color */
+.icon-button:hover,
+.icon-button:focus-visible {
+  background-color: rgba(13, 110, 253, 0.1);
+  color: var(--color-primary);
+  border-color: rgba(13, 110, 253, 0.25);
+  outline: none;
 }
 
-.side-menu-content {
-  padding: 15px;
+.side-menu__content {
+  flex: 1;
+  overflow-y: auto;
 }
 
 .menu-items {
   list-style: none;
   padding: 0;
   margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
-.menu-items li {
-  margin-bottom: 10px;
-}
-
-.menu-items a {
+.menu-items .nav-link {
   display: block;
-  padding: 8px 10px;
-  color: #212529;
-  text-decoration: none;
-  border-radius: 4px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-weight: 500;
+  color: inherit;
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
-.menu-items a:hover, .menu-items a.active {
-  background-color: #f8f9fa;
-  color: #0d6efd; /* Bootstrap primary color */
+.menu-items .nav-link:hover,
+.menu-items .nav-link.router-link-active {
+  background-color: rgba(13, 110, 253, 0.12);
+  color: var(--color-primary);
 }
 
-/* Add margin for the fixed menu button */
 .main-content {
-  padding-top: 1rem; 
-  min-height: 100vh;
+  padding: 32px 24px 48px;
+}
+
+@media (max-width: 768px) {
+  .menu-toggle {
+    top: 16px;
+    left: 16px;
+    width: 44px;
+    height: 44px;
+  }
+
+  .main-content {
+    padding: 24px 16px;
+  }
 }
 </style>

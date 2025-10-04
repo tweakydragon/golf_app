@@ -8,16 +8,41 @@ const Home = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const unwrapSessionList = (payload) => {
+    if (!payload) {
+      return [];
+    }
+
+    if (Array.isArray(payload)) {
+      return payload;
+    }
+
+    if (typeof payload === 'object') {
+      if (payload.success === false) {
+        const error = new Error(payload.message || 'Failed to load sessions. Please try again later.');
+        error.code = payload.errorCode;
+        throw error;
+      }
+
+      if (Array.isArray(payload.data)) {
+        return payload.data;
+      }
+    }
+
+    return [];
+  };
 
   const fetchSessions = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
       const response = await axios.get('http://localhost:8080/api/sessions');
-      setSessions(response.data);
+      const payload = response.data;
+      setSessions(unwrapSessionList(payload));
     } catch (err) {
       console.error('Error fetching sessions:', err);
-      setError('Failed to load sessions. Please try again later.');
+      const message = err.response?.data?.message || err.message || 'Failed to load sessions. Please try again later.';
+      setError(message);
     } finally {
       setLoading(false);
     }
@@ -32,10 +57,12 @@ const Home = () => {
         endpoint = `http://localhost:8080/api/sessions/search?title=${encodeURIComponent(searchQuery.trim())}`;
       }
       const response = await axios.get(endpoint);
-      setSessions(response.data);
+      const payload = response.data;
+      setSessions(unwrapSessionList(payload));
     } catch (err) {
       console.error('Error searching sessions:', err);
-      setError('Failed to search sessions. Please try again later.');
+      const message = err.response?.data?.message || err.message || 'Failed to search sessions. Please try again later.';
+      setError(message);
     } finally {
       setLoading(false);
     }

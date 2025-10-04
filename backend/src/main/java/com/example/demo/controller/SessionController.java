@@ -1,8 +1,6 @@
 package com.example.demo.controller;
 
 import com.example.demo.dto.ApiResponse;
-import com.example.demo.dto.SessionCreateRequest;
-import com.example.demo.dto.SessionSummaryResponse;
 import com.example.demo.exception.ResourceNotFoundException;
 import com.example.demo.exception.ValidationException;
 import com.example.demo.exception.InvalidFileFormatException;
@@ -17,7 +15,6 @@ import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -25,11 +22,12 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import com.example.demo.dto.SessionDTO;
+import com.example.demo.dto.DtoMapper;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -193,7 +191,7 @@ public class SessionController {
             } else {
                 // Default to Garmin R10 processing
                 session = csvService.processGarminR10Csv(file, title, locationString);
-                session.setSourceType("GARMIN_R10");
+                // Source type is set inside CsvService using enum; ensure not overwritten with string
             }
             
             return ResponseEntity.status(HttpStatus.CREATED)
@@ -261,8 +259,9 @@ public class SessionController {
      * Search for sessions by title
      */
     @GetMapping("/search")
-    public ResponseEntity<List<Session>> searchSessions(@RequestParam String title) {
+    public ResponseEntity<List<SessionDTO>> searchSessions(@RequestParam String title) {
         List<Session> sessions = sessionService.searchSessionsByTitle(title);
-        return new ResponseEntity<>(sessions, HttpStatus.OK);
+    List<SessionDTO> dtoList = sessions.stream().map(DtoMapper::toSessionDTO).toList();
+        return new ResponseEntity<>(dtoList, HttpStatus.OK);
     }
 }

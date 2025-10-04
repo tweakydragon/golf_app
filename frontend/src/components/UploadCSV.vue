@@ -210,18 +210,29 @@ const handleSubmit = async () => {
         'Content-Type': 'multipart/form-data'
       }
     });
-    
-    if (response.data && response.data.id) {
-      uploadedSessionId.value = response.data.id;
-      successMessage.value = 'File uploaded and analyzed successfully!';
+
+    const payload = response.data ?? {};
+    const sessionData = payload && typeof payload === 'object' && 'data' in payload ? payload.data : payload;
+
+    if (sessionData && sessionData.id) {
+      uploadedSessionId.value = sessionData.id;
+      successMessage.value = payload.message || 'File uploaded and analyzed successfully!';
+    } else if (payload && typeof payload === 'object' && payload.success === false) {
+      error.value = payload.message || 'Failed to upload and analyze the file. Please try again.';
     } else {
       error.value = 'Unexpected response from server. Please try again.';
     }
   } catch (err) {
     console.error('Error uploading CSV:', err);
-    
-    if (err.response && err.response.data && err.response.data.error) {
-      error.value = err.response.data.error;
+
+    const responseData = err.response?.data;
+    if (responseData && typeof responseData === 'object') {
+      const baseMessage = responseData.message || responseData.error;
+      const fieldErrors = typeof responseData.fieldErrors === 'object' && responseData.fieldErrors !== null
+        ? Object.values(responseData.fieldErrors).filter(Boolean).join(' ')
+        : '';
+      const composedMessage = [baseMessage, fieldErrors].filter(Boolean).join(' ').trim();
+      error.value = composedMessage || 'Failed to upload and analyze the file. Please try again.';
     } else {
       error.value = 'Failed to upload and analyze the file. Please try again.';
     }
@@ -229,7 +240,6 @@ const handleSubmit = async () => {
     isUploading.value = false;
   }
 };
-
 const resetForm = () => {
   formData.value = {
     title: '',
