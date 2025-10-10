@@ -147,6 +147,14 @@
 
 <script setup>
 import { ref, computed, onMounted, watch, nextTick } from 'vue';
+import {
+  computeOverheadScales,
+  computeSideScales,
+  generateOverheadPath,
+  getOverheadLandingPoint,
+  getShotDistance,
+  getShotApex,
+} from '../utils/shotGeometry';
 
 const props = defineProps({
   shots: {
@@ -266,131 +274,82 @@ const findShotAtPosition = (x, y, canvas) => {
 };
 
 const findShotAtPositionOverhead = (x, y, width, height, margin) => {
-  const maxDistance = Math.max(...props.shots.map(shot => 
-    shot.totalDistance || shot.carryDistance || 200), 300);
-  const maxLateral = Math.max(...props.shots.map(shot => 
-    Math.abs(shot.deviation || shot.totalLateralDistance || 0)), 50);
-  
-  const scaleX = (width - 2 * margin) / maxDistance;
-  const scaleY = (height - 2 * margin) / (maxLateral * 2);
-  
-  for (let i = 0; i < props.shots.length; i++) {
+  const { scaleX, scaleY } = computeOverheadScales(props.shots, width, height, margin);
+
+  for (let i = 0; i < props.shots.length; i += 1) {
     const shot = props.shots[i];
-    const distance = shot.totalDistance || shot.carryDistance || 0;
-    const lateral = shot.deviation || shot.totalLateralDistance || shot.carryLateralDistance || 0;
-    const launchDirection = shot.launchDirection || shot.horizontalLaunch || 0;
-    const spinAxis = shot.spinAxis || 0;
-    
-    if (distance > 0) {
-      // Check along the flight path, not just the landing point
-      const steps = 10;
-      for (let step = 0; step <= steps; step++) {
-        const t = step / steps;
-        const currentDistance = distance * t;
-        
-        // Calculate lateral movement (same logic as drawing)
-        let currentLateral = 0;
-        
-        // Use multiple approaches to create realistic curves (same as drawing)
-        if (Math.abs(launchDirection) > 0.1) {
-          const launchEffect = launchDirection * Math.sin(t * Math.PI * 0.8) * 0.4;
-          currentLateral += launchEffect;
-        }
-        
-        if (Math.abs(spinAxis) > 0.1) {
-          const spinEffect = (spinAxis / 45) * lateral * Math.sin(t * Math.PI * 1.2) * t;
-          currentLateral += spinEffect;
-        }
-        
-        if (Math.abs(lateral) > 0.1) {
-          const finalCurve = lateral * (3 * t * t - 2 * t * t * t);
-          currentLateral += finalCurve;
-        }
-        
-        // Add shot classification effects
-        if (shot.shotClassification) {
-          const classification = shot.shotClassification.toLowerCase();
-          if (classification.includes('slice')) {
-            currentLateral += (distance / 200) * 10 * Math.pow(t, 2.5);
-          } else if (classification.includes('hook') || classification.includes('draw')) {
-            currentLateral -= (distance / 200) * 8 * Math.pow(t, 2.5);
-          } else if (classification.includes('fade')) {
-            currentLateral += (distance / 200) * 5 * Math.pow(t, 2);
-          }
-        }
-        
-        const shotX = margin + currentDistance * scaleX;
-        const shotY = height / 2 - currentLateral * scaleY;
-        
-        const dx = x - shotX;
-        const dy = y - shotY;
-        const distance2 = dx * dx + dy * dy;
-        
-        if (distance2 < 144) { // 12px radius for easier selection along path
-          return i;
-        }
+    const pathPoints = generateOverheadPath(shot, 10);
+
+    if (!pathPoints.length) {
+      continue;
+    }
+
+    for (const point of pathPoints) {
+      const shotX = margin + point.distance * scaleX;
+      const shotY = height / 2 - point.lateral * scaleY;
+      const dx = x - shotX;
+      const dy = y - shotY;
+
+      if (dx * dx + dy * dy < 144) {
+        return i;
       }
     }
   }
+
   return null;
 };
 
 const findShotAtPositionSide = (x, y, width, height, margin) => {
-  const maxDistance = Math.max(...props.shots.map(shot => 
-    shot.totalDistance || shot.carryDistance || 200), 300);
-  const maxHeight = Math.max(...props.shots.map(shot => 
-    shot.apex || shot.peakHeight || 0), 100);
-  
-  const scaleX = (width - 2 * margin) / maxDistance;
-  const scaleY = (height - 2 * margin) / maxHeight;
-  
-  for (let i = 0; i < props.shots.length; i++) {
+  const { scaleX } = computeSideScales(props.shots, width, height, margin);
+
+  for (let i = 0; i < props.shots.length; i += 1) {
     const shot = props.shots[i];
-    const distance = shot.totalDistance || shot.carryDistance || 0;
-    
+    const distance = getShotDistance(shot);
+
     const shotX = margin + distance * scaleX;
-    const shotY = height - margin; // Landing point
-    
+    const shotY = height - margin;
     const dx = x - shotX;
     const dy = y - shotY;
-    const distance2 = dx * dx + dy * dy;
-    
-    if (distance2 < 100) { // 10px radius
+
+    if (dx * dx + dy * dy < 100) {
       return i;
     }
   }
+
   return null;
 };
 
 const drawOverheadView = (ctx, width, height) => {
   const margin = 40;
-  
-  // Clear and setup
+
   ctx.clearRect(0, 0, width, height);
-  
-  // Background gradient (golf course)
-  const grassGradient = ctx.createRadialGradient(width/2, height/2, 0, width/2, height/2, Math.max(width, height)/2);
+
+  const grassGradient = ctx.createRadialGradient(
+    width / 2,
+    height / 2,
+    0,
+    width / 2,
+    height / 2,
+    Math.max(width, height) / 2
+  );
   grassGradient.addColorStop(0, '#90EE90');
   grassGradient.addColorStop(1, '#228B22');
   ctx.fillStyle = grassGradient;
   ctx.fillRect(0, 0, width, height);
-  
-  // Calculate scales
-  const maxDistance = Math.max(...props.shots.map(shot => 
-    shot.totalDistance || shot.carryDistance || 200), 300);
-  const maxLateral = Math.max(...props.shots.map(shot => 
-    Math.abs(shot.deviation || shot.totalLateralDistance || 0)), 50);
-  
-  const scaleX = (width - 2 * margin) / maxDistance;
-  const scaleY = (height - 2 * margin) / (maxLateral * 2);
-  
-  // Draw distance markers every 50 yards
+
+  const { scaleX, scaleY, maxDistance } = computeOverheadScales(
+    props.shots,
+    width,
+    height,
+    margin
+  );
+
   ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
   ctx.lineWidth = 1;
   ctx.font = '10px Arial';
   ctx.fillStyle = '#333';
   ctx.textAlign = 'center';
-  
+
   for (let dist = 50; dist <= maxDistance; dist += 50) {
     const x = margin + dist * scaleX;
     ctx.setLineDash([3, 3]);
@@ -401,8 +360,7 @@ const drawOverheadView = (ctx, width, height) => {
     ctx.setLineDash([]);
     ctx.fillText(`${dist}y`, x, height - margin + 15);
   }
-  
-  // Draw target line
+
   ctx.strokeStyle = '#FFD700';
   ctx.lineWidth = 2;
   ctx.setLineDash([10, 5]);
@@ -411,155 +369,65 @@ const drawOverheadView = (ctx, width, height) => {
   ctx.lineTo(width - margin, height / 2);
   ctx.stroke();
   ctx.setLineDash([]);
-  
-  // Draw tee box
+
   ctx.fillStyle = '#8B4513';
   ctx.fillRect(margin - 10, height / 2 - 5, 20, 10);
-  
-  // Draw all shots with curved flight paths
+
   props.shots.forEach((shot, index) => {
-    const distance = shot.totalDistance || shot.carryDistance || 0;
-    const lateral = shot.deviation || shot.totalLateralDistance || shot.carryLateralDistance || 0;
-    const launchDirection = shot.launchDirection || shot.horizontalLaunch || 0;
-    const spinAxis = shot.spinAxis || 0;
-    
-    // Debug log for first shot to see available data (remove after testing)
-    if (index === 0 && !window.debugLogged) {
-      console.log('Shot data:', {
-        distance,
-        lateral,
-        launchDirection,
-        spinAxis,
-        totalLateralDistance: shot.totalLateralDistance,
-        carryLateralDistance: shot.carryLateralDistance,
-        deviation: shot.deviation,
-        horizontalLaunch: shot.horizontalLaunch,
-        shotClassification: shot.shotClassification
-      });
-      window.debugLogged = true;
+    const pathPoints = generateOverheadPath(shot);
+    if (!pathPoints.length) {
+      return;
     }
-    
-    if (distance > 0) {
-      const shotX = margin + distance * scaleX;
-      const shotY = height / 2 - lateral * scaleY;
-      
-      // Calculate flight path curve
-      ctx.strokeStyle = props.highlightedShotIndex === index ? '#ffc107' : '#007bff';
-      ctx.lineWidth = props.highlightedShotIndex === index ? 3 : 2;
-      ctx.beginPath();
-      ctx.moveTo(margin, height / 2);
-      
-      // Draw curved flight path based on shot data
-      const steps = 20;
-      for (let i = 1; i <= steps; i++) {
-        const t = i / steps;
-        const currentDistance = distance * t;
-        
-        // Calculate lateral movement based on available data
-        let currentLateral = 0;
-        
-        // Use multiple approaches to create realistic curves
-        if (Math.abs(launchDirection) > 0.1) {
-          // Initial launch direction effect (more prominent early in flight)
-          const launchEffect = launchDirection * Math.sin(t * Math.PI * 0.8) * 0.4;
-          currentLateral += launchEffect;
+
+    const landing = getOverheadLandingPoint(shot);
+    const shotX = margin + landing.distance * scaleX;
+    const shotY = height / 2 - landing.lateral * scaleY;
+
+    ctx.strokeStyle = props.highlightedShotIndex === index ? '#ffc107' : '#007bff';
+    ctx.lineWidth = props.highlightedShotIndex === index ? 3 : 2;
+    ctx.beginPath();
+    ctx.moveTo(margin, height / 2);
+
+    pathPoints.slice(1).forEach(({ distance, lateral }) => {
+      const currentX = margin + distance * scaleX;
+      const currentY = height / 2 - lateral * scaleY;
+      ctx.lineTo(currentX, currentY);
+    });
+    ctx.stroke();
+
+    if (props.highlightedShotIndex === index) {
+      ctx.fillStyle = 'rgba(255, 193, 7, 0.3)';
+      pathPoints.forEach(({ distance, lateral }, pointIndex) => {
+        if (pointIndex % 5 !== 0) {
+          return;
         }
-        
-        if (Math.abs(spinAxis) > 0.1) {
-          // Spin axis effect (creates draw/fade)
-          const spinEffect = (spinAxis / 45) * lateral * Math.sin(t * Math.PI * 1.2) * t;
-          currentLateral += spinEffect;
-        }
-        
-        if (Math.abs(lateral) > 0.1) {
-          // Final lateral position creates a curve
-          const finalCurve = lateral * (3 * t * t - 2 * t * t * t); // Smooth S-curve
-          currentLateral += finalCurve;
-        }
-        
-        // Add some natural variation based on shot classification
-        if (shot.shotClassification) {
-          const classification = shot.shotClassification.toLowerCase();
-          if (classification.includes('slice')) {
-            // Slice curves more to the right late in flight
-            currentLateral += (distance / 200) * 10 * Math.pow(t, 2.5);
-          } else if (classification.includes('hook') || classification.includes('draw')) {
-            // Hook/draw curves left
-            currentLateral -= (distance / 200) * 8 * Math.pow(t, 2.5);
-          } else if (classification.includes('fade')) {
-            // Fade curves slightly right
-            currentLateral += (distance / 200) * 5 * Math.pow(t, 2);
-          }
-        }
-        
-        const currentX = margin + currentDistance * scaleX;
-        const currentY = height / 2 - currentLateral * scaleY;
-        
-        ctx.lineTo(currentX, currentY);
-      }
-      ctx.stroke();
-      
-      // Draw flight path points for highlighted shot
-      if (props.highlightedShotIndex === index) {
-        ctx.fillStyle = 'rgba(255, 193, 7, 0.3)';
-        for (let i = 0; i <= steps; i += 5) {
-          const t = i / steps;
-          const currentDistance = distance * t;
-          let currentLateral = 0;
-          
-          // Use same calculation as main drawing
-          if (Math.abs(launchDirection) > 0.1) {
-            const launchEffect = launchDirection * Math.sin(t * Math.PI * 0.8) * 0.4;
-            currentLateral += launchEffect;
-          }
-          
-          if (Math.abs(spinAxis) > 0.1) {
-            const spinEffect = (spinAxis / 45) * lateral * Math.sin(t * Math.PI * 1.2) * t;
-            currentLateral += spinEffect;
-          }
-          
-          if (Math.abs(lateral) > 0.1) {
-            const finalCurve = lateral * (3 * t * t - 2 * t * t * t);
-            currentLateral += finalCurve;
-          }
-          
-          if (shot.shotClassification) {
-            const classification = shot.shotClassification.toLowerCase();
-            if (classification.includes('slice')) {
-              currentLateral += (distance / 200) * 10 * Math.pow(t, 2.5);
-            } else if (classification.includes('hook') || classification.includes('draw')) {
-              currentLateral -= (distance / 200) * 8 * Math.pow(t, 2.5);
-            } else if (classification.includes('fade')) {
-              currentLateral += (distance / 200) * 5 * Math.pow(t, 2);
-            }
-          }
-          
-          const currentX = margin + currentDistance * scaleX;
-          const currentY = height / 2 - currentLateral * scaleY;
-          
-          ctx.beginPath();
-          ctx.arc(currentX, currentY, 2, 0, 2 * Math.PI);
-          ctx.fill();
-        }
-      }
-      
-      // Landing point
-      ctx.fillStyle = props.highlightedShotIndex === index ? '#ffc107' : '#dc3545';
-      ctx.beginPath();
-      ctx.arc(shotX, shotY, props.highlightedShotIndex === index ? 8 : 6, 0, 2 * Math.PI);
-      ctx.fill();
-      
-      // Shot number for highlighted shot
-      if (props.highlightedShotIndex === index) {
-        ctx.fillStyle = '#000';
-        ctx.font = 'bold 10px Arial';
-        ctx.textAlign = 'center';
-        ctx.fillText(shot.shotNumber, shotX, shotY + 3);
-      }
+        const currentX = margin + distance * scaleX;
+        const currentY = height / 2 - lateral * scaleY;
+        ctx.beginPath();
+        ctx.arc(currentX, currentY, 2, 0, 2 * Math.PI);
+        ctx.fill();
+      });
+    }
+
+    ctx.fillStyle = props.highlightedShotIndex === index ? '#ffc107' : '#dc3545';
+    ctx.beginPath();
+    ctx.arc(
+      shotX,
+      shotY,
+      props.highlightedShotIndex === index ? 8 : 6,
+      0,
+      2 * Math.PI
+    );
+    ctx.fill();
+
+    if (props.highlightedShotIndex === index) {
+      ctx.fillStyle = '#000';
+      ctx.font = 'bold 10px Arial';
+      ctx.textAlign = 'center';
+      ctx.fillText(shot.shotNumber, shotX, shotY + 3);
     }
   });
-  
-  // Labels
+
   ctx.fillStyle = '#333';
   ctx.font = '12px Arial';
   ctx.textAlign = 'center';
@@ -568,28 +436,21 @@ const drawOverheadView = (ctx, width, height) => {
 
 const drawSideView = (ctx, width, height) => {
   const margin = 40;
-  
-  // Clear and setup
   ctx.clearRect(0, 0, width, height);
-  
-  // Background gradient (sky to ground)
   const skyGradient = ctx.createLinearGradient(0, 0, 0, height);
   skyGradient.addColorStop(0, '#87CEEB');
   skyGradient.addColorStop(0.7, '#E0F6FF');
   skyGradient.addColorStop(1, '#90EE90');
   ctx.fillStyle = skyGradient;
   ctx.fillRect(0, 0, width, height);
-  
-  // Calculate scales
-  const maxDistance = Math.max(...props.shots.map(shot => 
-    shot.totalDistance || shot.carryDistance || 200), 300);
-  const maxHeight = Math.max(...props.shots.map(shot => 
-    shot.apex || shot.peakHeight || 0), 100);
-  
-  const scaleX = (width - 2 * margin) / maxDistance;
-  const scaleY = (height - 2 * margin) / maxHeight;
-  
-  // Draw distance markers every 50 yards
+
+  const { scaleX, scaleY, maxDistance } = computeSideScales(
+    props.shots,
+    width,
+    height,
+    margin
+  );
+
   ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
   ctx.lineWidth = 1;
   ctx.font = '10px Arial';
@@ -617,8 +478,8 @@ const drawSideView = (ctx, width, height) => {
   
   // Draw all shot trajectories
   props.shots.forEach((shot, index) => {
-    const distance = shot.totalDistance || shot.carryDistance || 0;
-    const maxH = shot.apex || shot.peakHeight || (distance * 0.15);
+    const distance = getShotDistance(shot);
+    const maxH = getShotApex(shot);
     const launchAngle = shot.launchAngle || 15;
     
     if (distance > 0) {
