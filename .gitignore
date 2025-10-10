@@ -11,6 +11,10 @@ node_modules
 dist
 dist-ssr
 *.local
+coverage
+db_gui/
+*.backup
+*.fresh
 
 # Editor directories and files
 .vscode/*
